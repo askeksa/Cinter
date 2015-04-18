@@ -250,19 +250,18 @@ print "Generated %d different note IDs" % note_id
 
 
 # Export instrument parameters
+def param(s):
+	if s == "X" * len(s):
+		return pow(10, len(s))
+	return int(s)
+
 inst_data = ""
 total_inst_size = 0
 for i in inst_list:
 	inst = module.instruments[i]
 	try:
-		p = [int(inst.name[pi*2+5:pi*2+7], 16) for pi in range(8)]
-		try:
-			dist = int(inst.name[1:5], 16)
-			rdist = ((dist >> 3) | (dist << 13)) & 0xFFFF
-			rdist = rdist - 0x1110
-			print [(rdist >> (s*4)) & 0xF for s in range(4)]
-		except ValueError:
-			dist = 0x8880
+		p = [param(inst.name[pi*2+1:pi*2+3]) for pi in range(8)]
+		p += [param(inst.name[pi+17:pi+18]) for pi in range(4)]
 
 		length = inst.length
 		if inst.repoffset == 0 and inst.replen == 1:
@@ -275,6 +274,7 @@ for i in inst_list:
 				print "Instrument %d repeat is not at end" % i
 		total_inst_size += length
 
+		# Parameters on word form for synth code
 		attack      = 65536-int(math.floor(10000.0 / (1 + p[0] * p[0])))
 		decay       = int(math.floor(10000.0 / (1 + p[1] * p[1])))
 		mpitch      = p[2] * 512
@@ -283,6 +283,9 @@ for i in inst_list:
 		bpitchdecay = int(math.floor(math.exp(-0.000002 * p[5] * p[5]) * 65536)) & 0xffff
 		mod         = p[6]
 		moddecay    = int(math.floor(math.exp(-0.000002 * p[7] * p[7]) * 65536)) & 0xffff
+
+		# Distortion parameters for synth code
+		dist = (p[8] << 12) | (p[9] << 8) | (p[10] << 4) | p[11]
 
 		inst_data  += struct.pack(">11H", length, replen, mpitch, mod, bpitch, attack, dist, decay, mpitchdecay, moddecay, bpitchdecay)
 	except ValueError:

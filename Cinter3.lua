@@ -92,12 +92,22 @@ programs = {
 			"moddecay",
 			"mdist",
 			"bdist",
-			"fdist",
-			"vpower"
+			"vpower",
+			"fdist"
 		},
 		new = function(channel, tone, velocity)
 			function p(v)
 				return math.floor(v * 100 + 0.5)
+			end
+			function ps(v, width)
+				if v == 1.0 then
+					return string.rep("X", width)
+				end
+				if width == 1 then
+					return string.format("%01d", math.floor(v * 10 + 0.5))
+				else
+					return string.format("%02d", math.floor(v * 100 + 0.5))
+				end
 			end
 
 			note = {
@@ -109,10 +119,10 @@ programs = {
 				mpitchdecay = math.floor(math.exp(-0.000002 * p(params.mpitchdecay) * p(params.mpitchdecay)) * 65536),
 				bpitchdecay = math.floor(math.exp(-0.000002 * p(params.bpitchdecay) * p(params.bpitchdecay)) * 65536),
 				moddecay    = math.floor(math.exp(-0.000002 * p(params.moddecay)    * p(params.moddecay)   ) * 65536),
-				mdist       = math.floor(0.5 + params.mdist * 14),
-				bdist       = math.floor(0.5 + params.bdist * 14),
-				fdist       = math.floor(0.5 + params.fdist * 14),
-				vpower      = math.floor(0.5 + params.vpower * 14),
+				mdist       = math.floor(0.5 + params.mdist * 10),
+				bdist       = math.floor(0.5 + params.bdist * 10),
+				vpower      = math.floor(0.5 + params.vpower * 10),
+				fdist       = math.floor(0.5 + params.fdist * 10),
 
 				amp            = 0,
 				attacking      = true,
@@ -139,24 +149,26 @@ programs = {
 					while l > 1 and note.sampledata[l] == 0 do
 						l = l - 1
 					end
-
-					local dist = note.mdist + note.bdist * 16 + note.vpower * 256 + note.fdist * 4096
-					dist = dist + 0x1110
-					dist = bit.band(bit.lshift(dist, 3) + bit.rshift(dist, 13), 65535)
+					if bit.band(l, 1) == 1 then
+						l = l + 1
+						note.sampledata[l] = 0
+					end
 
 					local filename
 					if note.tone == 52 then
 						-- Save with Protracker-compatible name
-						filename = string.format("s%04x%02x%02x%02x%02x%02x%02x%02x%02x.raw",
-							dist,
-							p(params.attack), p(params.decay),
-							p(params.mpitch), p(params.mpitchdecay),
-							p(params.bpitch), p(params.bpitchdecay),
-							p(params.mod),    p(params.moddecay))
+						filename = string.format("s%s%s%s%s%s%s%s%s%s%s%s%s.raw",
+							ps(params.attack, 2), ps(params.decay, 2),
+							ps(params.mpitch, 2), ps(params.mpitchdecay, 2),
+							ps(params.bpitch, 2), ps(params.bpitchdecay, 2),
+							ps(params.mod, 2),    ps(params.moddecay, 2),
+							ps(params.mdist, 1),  ps(params.bdist, 1),
+							ps(params.vpower, 1), ps(params.fdist, 1))
 					else
 						-- Save with a name to copy directly into asm data
+						local dist = note.mdist * 4096 + note.bdist * 256 + note.vpower * 16 + note.fdist
 						filename = string.format("sample_$%04x,$%04x,$%04x,$%04x,$%04x,$%04x,$%04x,$%04x,$%04x,$%04x.raw",
-							bit.band((l + 511) / 2, -256),
+							l / 2,
 							p(params.mpitch) * 512, p(params.mod), p(params.bpitch) * 512,
 							bit.band(-note.attack, 65535), dist, note.decay,
 							bit.band(note.mpitchdecay, 65535), bit.band(note.moddecay, 65535), bit.band(note.bpitchdecay, 65535))
@@ -164,9 +176,6 @@ programs = {
 					f = io.open(filename, "wb")
 					for i = 1, l do
 						f:write(string.char(bit.band(note.sampledata[i], 255)))
-					end
-					if bit.band(l, 1) == 1 then
-						f:write(string.char(0))
 					end
 					f:close()
 				end
