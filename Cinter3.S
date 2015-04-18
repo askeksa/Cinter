@@ -124,12 +124,9 @@ MakeInstruments:
 .mdist:	lsr.w	#2,d0
 	add.w	d0,d0
 	move.w	(a0,d0.w),d0
-	subq.b	#8,d4
-	bvs.b	.mstop
+	sub.w	#$1000,d4
 	bcc.b	.mdist
-.mstop:	addq.b	#8,d4
-	subq.w	#8,d4
-	ror.w	#4,d4
+	lsl.w	#4,d4
 
 	; Modulation strength
 	move.w	d0,d2
@@ -150,34 +147,27 @@ MakeInstruments:
 .bdist:	lsr.w	#2,d0
 	add.w	d0,d0
 	move.w	(a0,d0.w),d0
-	subq.b	#8,d4
-	bvs.b	.bstop
+	sub.w	#$1000,d4
 	bcc.b	.bdist
-.bstop:	addq.b	#8,d4
-	subq.w	#8,d4
-	ror.w	#4,d4
+	lsl.w	#4,d4
 
 	; Amplitude
 	move.w	(a1)+,d1
-.vpower:	muls.w	(a1),d0
+.vpower:	muls.w	0(a1),d0	; Dummy offset for better compression
 	add.l	d0,d0
 	swap.w	d0
-	subq.b	#8,d4
-	bvs.b	.vstop
+	sub.w	#$1000,d4
 	bcc.b	.vpower
-.vstop:	addq.b	#8,d4
-	subq.w	#8,d4
-	ror.w	#4,d4
+	lsl.w	#4,d4
 
 	; Final distortion
 	bra.b	.fdist_in
 .fdist:	lsr.w	#2,d0
 	add.w	d0,d0
 	move.w	(a0,d0.w),d0
-.fdist_in:	subq.b	#8,d4
-	bvs.b	.fstop
+.fdist_in:	sub.w	#$1000,d4
 	bcc.b	.fdist
-.fstop:
+
 	; Write sample
 	add.w	d0,d0
 	bvc.b	.notover
@@ -265,7 +255,7 @@ CinterPlay1:
 	move.w	$006(a3),d4
 	add.w	#$0780,d4
 	or.w	#$8000,d5
-	movem.w	d4/d5,12*4(a0)
+	movem.w	d4/d5,c_waitline-(c_MusicPointer+4)(a0)
 	rts
 
 CinterPlay2:
