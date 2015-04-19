@@ -117,9 +117,9 @@ for p in module.positions[:module.songlength]:
 				volume[t] = module.instruments[tr.inst].volume
 			if tr.cmd == 0xC:
 				volume[t] = tr.arg
-			if tr.cmd == 0xE and arg1 == 0xC:
-				cut = arg2
-				volumedata[t] += [volume[t]] * cut + [0] * (speed - cut)
+			if tr.cmd == 0xE and arg1 == 0xC and arg2 < speed:
+				volumedata[t] += [volume[t]] * arg2 + [0] * (speed - arg2)
+				volume[t] = 0
 			elif tr.cmd == 0x5 or tr.cmd == 0xA:
 				if arg1:
 					slide = arg1
