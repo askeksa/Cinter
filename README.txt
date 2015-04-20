@@ -64,6 +64,10 @@ fdist (Final Distortion):
 At least one of attack and decay and at least one of the pitches must be raised
 above zero to get any sound.
 
+You can easily convert back from a saved sample to the original parameters:
+- For the first 8 parameters, divide two digits by 100. XX means 1.
+- For the last 4 parameters, divide one digit by 10. X means 1.
+
 
 PROTRACKER GUIDELINES
 
