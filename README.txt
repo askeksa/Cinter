@@ -13,6 +13,7 @@ You will need:
 - Python 2.x, where x >= 5
 - An assembler, but you would need that for the intro anyway. :)
 
+
 To use the synth, you need to follow these steps:
 1. Download MetaSynth.dll from https://bitbucket.org/askeksa/metasynth/downloads
    (or use the one included in the Cinter distribution archive). This is a
@@ -43,7 +44,7 @@ Cinter is a simple, two-oscillator phase modulation synth. It has the following
 parameters:
 
 attack/decay:
-  How fast the volume envelope of the sound rises and falls.
+  The durations for which the volume envelope of the sound rises and falls.
 mpitch/bpitch (Modulation Pitch / Base Pitch):
   The pitch of the oscillators. To get an in-tune sound, set each of these to
   one of 0.01, 0.02, 0.04, 0.08, 0.16, 0.32 or 0.64.
@@ -70,7 +71,7 @@ You may change the initial 's' in the sample names to a different character,
 but the sample names must be otherwise intact, in order to communicate the
 instrument parameters to the conversion script.
 
-You can write whatever you want in the names of unused instruments, so the
+You can write whatever you like in the names of unused instruments, so the
 traditional module info can be placed here.
 
 You are allowed to shorten instruments by changing their lengths or cutting
@@ -82,7 +83,7 @@ Finetune must be zero for all instruments.
 Instrument volume can be set arbitrarily.*
 
 Sample repeat must be either absent (offset 0, length 2) or placed at the very
-end of the (possibly truncated) sample.
+end of the (possibly shortened) sample.
 
 Support for effect commands are as follows:
 0     (arpeggio)      Supported
@@ -135,11 +136,12 @@ CinterInit:
   depending on the values of the distortion and vpower parameters
   (higher parameter values result in slower computation).
 
-CinterInterrupt1:
+CinterPlay1:
   Call as the very first thing in your vblank interrupt.
-  Stops playing samples in channels where a new sample is to be triggered.
+  Stops previously playing samples in channels where a new sample is to be
+  triggered.
 
-CinterInterrupt2:
+CinterPlay2:
   Call as the very last thing in your vblank interrupt.
   Modifies volumes and periods according to music.
   Waits until enough time has passed since previously playing samples
@@ -147,4 +149,6 @@ CinterInterrupt2:
 
 The replayer does not stop automatically at the end of the music. The
 intro must exit before the music reaches its end or the replayer will
-play random garbage from memory.
+play random garbage from memory. If you want extra silence at the end,
+you must add empty patterns as appropriate.
+
