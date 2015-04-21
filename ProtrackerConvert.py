@@ -56,8 +56,15 @@ def printpattern(pat):
 		print
 
 
+n_errors = 0
+if len(sys.argv) <3:
+	print "Usage: %s <input module file> <output binary data file>" % sys.argv[0]
+	sys.exit(1)
+module_file = sys.argv[1]
+output_file = sys.argv[2]
 
-module = Module(open(sys.argv[1], "rb"))
+print "Converting module file %s..." % module_file
+module = Module(open(module_file, "rb"))
 
 volumedata = [[],[],[],[]]
 notedata = [[],[],[],[]]
@@ -244,8 +251,7 @@ for track in range(4):
 
 # List of used instruments
 inst_list = [inst for inst in range(32) if inst_counts[inst] != 0]
-#inst_list.sort(key=(lambda i : inst_counts[i]), reverse=True)
-print [(i, inst_counts[i]) for i in inst_list]
+inst_list.sort(key=(lambda i : inst_counts[i]), reverse=True)
 
 # Build note ID mapping table
 note_id = 0
@@ -253,8 +259,7 @@ note_ids = dict()
 note_range_list = []
 for inst in inst_list:
 	if (inst,0) not in minmax_note:
-		note_range_list += [(0,0,0)]
-		note_id += 1
+		minmax_note[(inst,0)] = (0,0)
 	for offset in range(0,256):
 		if (inst,offset) in minmax_note:
 			note_min,note_max = minmax_note[(inst,offset)]
@@ -263,70 +268,19 @@ for inst in inst_list:
 				note_ids[(inst,offset,n)] = note_id
 				note_id += 1
 
-print "Generated %d different note IDs" % note_id
-
-
-# Export instrument parameters
-def param(s):
-	if s == "X" * len(s):
-		return pow(10, len(s))
-	return int(s)
-
-inst_data = ""
-total_inst_size = 0
-for i in inst_list:
-	inst = module.instruments[i]
-	try:
-		# Read parameters
-		p = [param(inst.name[pi*2+1:pi*2+3]) for pi in range(8)]
-		p += [param(inst.name[pi+17:pi+18]) for pi in range(4)]
-
-		# Length and repeat length
-		length = inst.length
-		if length < 2:
-			print "Instrument %d is empty" % i
-			length = 2
-		if inst.repoffset == 0 and inst.replen in [0,1]:
-			replen = 0
-			while inst.samples[(length-1)*2:length*2] == "\0\0":
-				length -= 1
-		else:
-			replen = inst.replen
-			if inst.repoffset != inst.length - inst.replen:
-				print "Instrument %d repeat is not at end" % i
-		total_inst_size += length
-
-		# Parameters on word form for synth code
-		attack      = 65536-int(math.floor(10000.0 / (1 + p[0] * p[0])))
-		decay       = int(math.floor(10000.0 / (1 + p[1] * p[1])))
-		mpitch      = p[2] * 512
-		mpitchdecay = int(math.floor(math.exp(-0.000002 * p[3] * p[3]) * 65536)) & 0xffff
-		bpitch      = p[4] * 512
-		bpitchdecay = int(math.floor(math.exp(-0.000002 * p[5] * p[5]) * 65536)) & 0xffff
-		mod         = p[6]
-		moddecay    = int(math.floor(math.exp(-0.000002 * p[7] * p[7]) * 65536)) & 0xffff
-
-		# Distortion parameters for synth code
-		dist = (p[8] << 12) | (p[9] << 8) | (p[10] << 4) | p[11]
-
-		inst_data  += struct.pack(">11H", length, replen, mpitch, mod, bpitch, attack, dist, decay, mpitchdecay, moddecay, bpitchdecay)
-	except ValueError:
-		print "Could not parse parameters for instrument %d" % i
-		inst_data  += struct.pack(">11H", 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-
-inst_data = struct.pack(">h", len(inst_list)-1) + inst_data
 
 # Export note ranges
 note_range_data = ""
 for note_min,note_max,offset in note_range_list:
 	note_range_data += struct.pack(">BBH", note_min, note_max - note_min + 1, offset * 128)
 
+
 # Export notes
 VOLUME_SHIFT = 9
 NOTE_SHIFT = 0
 NOTE_ABS_MASK = 0x80
 
-out = ""
+notes_data = ""
 dataset = set()
 for track in [3,2,1,0]:
 	initial = True
@@ -360,25 +314,103 @@ for track in [3,2,1,0]:
 					dper = 63
 				data = (dper << NOTE_SHIFT) | (dvol << VOLUME_SHIFT)
 				pdper = dper
-		out += struct.pack(">H", data)
+		notes_data += struct.pack(">H", data)
 		dataset.add(data)
 		pvol = vol
 		pper = per
 
-print "Generated %d different data words" % len(dataset)
+
+# Export instrument parameters
+def param(s):
+	if s == "X" * len(s):
+		return pow(10, len(s))
+	return int(s)
+
+inst_data = [""] * len(inst_list)
+total_inst_size = 0
+last_nonempty_inst = max(i for i in range(1, 32) if module.instruments[i].name.strip() != "")
 print
+print "    Name                   Length Repeat  Idx Count  Low High 9xx  Error?"
+for i in range(1, last_nonempty_inst + 1):
+	inst = module.instruments[i]
 
-print "MUSIC_LENGTH = %d" % musiclength
-print "NUM_INSTRUMENTS = %d" % len(inst_list)
-print "INSTRUMENT_BUFFER = %d" % (total_inst_size * 2)
+	# Unused instrument?
+	if i not in inst_list:
+		print "%02d  %-22s" % (i, inst.name)
+		continue
 
-fout = open(sys.argv[2], "wb")
+	# General statistics
+	index = inst_list.index(i)
+	min_note = min(note_min for ((inst,offset),(note_min,note_max)) in minmax_note.iteritems() if inst == i)
+	max_note = min(note_max for ((inst,offset),(note_min,note_max)) in minmax_note.iteritems() if inst == i)
+	offsets = sum(1 for inst,offset in minmax_note if inst == i)
+	msg = ""
+
+	# Length and repeat length
+	length = inst.length
+	if length < 2:
+		msg = "Empty!"
+		length = 2
+	if inst.repoffset == 0 and inst.replen in [0,1]:
+		replen = 0
+		while inst.samples[(length-1)*2:length*2] == "\0\0":
+			length -= 1
+	else:
+		replen = inst.replen
+		if inst.repoffset != inst.length - inst.replen:
+			msg = "Repeat is not at end!"
+	total_inst_size += length
+
+	try:
+		# Read parameters
+		p = [param(inst.name[pi*2+1:pi*2+3]) for pi in range(8)]
+		p += [param(inst.name[pi+17:pi+18]) for pi in range(4)]
+
+		# Parameters on word form for synth code
+		attack      = 65536-int(math.floor(10000.0 / (1 + p[0] * p[0])))
+		decay       = int(math.floor(10000.0 / (1 + p[1] * p[1])))
+		mpitch      = p[2] * 512
+		mpitchdecay = int(math.floor(math.exp(-0.000002 * p[3] * p[3]) * 65536)) & 0xffff
+		bpitch      = p[4] * 512
+		bpitchdecay = int(math.floor(math.exp(-0.000002 * p[5] * p[5]) * 65536)) & 0xffff
+		mod         = p[6]
+		moddecay    = int(math.floor(math.exp(-0.000002 * p[7] * p[7]) * 65536)) & 0xffff
+
+		# Distortion parameters for synth code
+		dist = (p[8] << 12) | (p[9] << 8) | (p[10] << 4) | p[11]
+
+		inst_data[index] = struct.pack(">11H", length, replen, mpitch, mod, bpitch, attack, dist, decay, mpitchdecay, moddecay, bpitchdecay)
+	except ValueError:
+		msg = "Parameter parse error!"
+		inst_data[index] = struct.pack(">11H", length, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+
+	print "%02d  %-22s %6d %6s   %2d %5d  %3s  %3s %3d  %s" % (
+		i, inst.name, length * 2, "" if not replen else replen * 2, index, inst_counts[i],
+		notename(min_note), notename(max_note), offsets - 1, msg
+	)
+	if msg != "":
+		n_errors += 1
+
+inst_data = struct.pack(">h", len(inst_list)-1) + "".join(inst_data)
+
+# Write output file
+fout = open(output_file, "wb")
 fout.write(inst_data)
-fout.write(struct.pack(">HH", len(out) / 4, len(note_range_data)))
+fout.write(struct.pack(">HH", len(notes_data) / 4, len(note_range_data)))
 fout.write(note_range_data)
-fout.write(out)
+fout.write(notes_data)
+out_size = fout.tell()
 fout.close()
 
-#pat = module.patterns[0]
-#printpattern(pat)
-#print module.positions
+print
+print "Uncompressed music data size:%7d" % out_size
+print "Total instrument memory:     %7d" % (total_inst_size * 2)
+print "Music duration in vblanks:   %7d" % musiclength
+print "Number of different note IDs:  %5d" % note_id
+print "Number of different data words:%5d" % len(dataset)
+print
+n_errors += len(reported_errors)
+if n_errors == 0:
+	print "No errors."
+else:
+	print "%d error%s." % (n_errors, "s" if n_errors > 1 else "")
