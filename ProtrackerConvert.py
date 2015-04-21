@@ -328,6 +328,7 @@ def param(s):
 
 inst_data = [""] * len(inst_list)
 total_inst_size = 0
+total_inst_time = 1.0
 last_nonempty_inst = max(i for i in range(1, 32) if module.instruments[i].name.strip() != "")
 print
 print "    Name                   Length Repeat  Idx Count  Low High 9xx  Error?"
@@ -380,6 +381,7 @@ for i in range(1, last_nonempty_inst + 1):
 		dist = (p[8] << 12) | (p[9] << 8) | (p[10] << 4) | p[11]
 
 		inst_data[index] = struct.pack(">11H", length, replen, mpitch, mod, bpitch, attack, dist, decay, mpitchdecay, moddecay, bpitchdecay)
+		total_inst_time += (20 + p[8] + p[9] + p[10] + p[11]) * length * 0.000017
 	except ValueError:
 		msg = "Parameter parse error!"
 		inst_data[index] = struct.pack(">11H", length, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
@@ -403,9 +405,10 @@ out_size = fout.tell()
 fout.close()
 
 print
-print "Uncompressed music data size:%7d" % out_size
-print "Total instrument memory:     %7d" % (total_inst_size * 2)
-print "Music duration in vblanks:   %7d" % musiclength
+print "Uncompressed music data size:%7d bytes" % out_size
+print "Total instrument memory:     %7d bytes" % (total_inst_size * 2)
+print "Appr. precalc time on 68000: %7d seconds" % int(total_inst_time + 0.5)
+print "Music duration:              %7d vblanks (%d:%02d)" % (musiclength, (musiclength + 25) / 3000, (musiclength + 25) % 3000 / 50)
 print "Number of different note IDs:  %5d" % note_id
 print "Number of different data words:%5d" % len(dataset)
 print
