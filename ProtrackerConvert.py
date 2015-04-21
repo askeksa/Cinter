@@ -405,12 +405,12 @@ out_size = fout.tell()
 fout.close()
 
 print
-print "Uncompressed music data size:%7d bytes" % out_size
-print "Total instrument memory:     %7d bytes" % (total_inst_size * 2)
-print "Appr. precalc time on 68000: %7d seconds" % int(total_inst_time + 0.5)
-print "Music duration:              %7d vblanks (%d:%02d)" % (musiclength, (musiclength + 25) / 3000, (musiclength + 25) % 3000 / 50)
-print "Number of different note IDs:  %5d" % note_id
-print "Number of different data words:%5d" % len(dataset)
+print "Uncompressed music data size: %7d bytes" % out_size
+print "Total instrument memory:      %7d bytes" % (total_inst_size * 2)
+print "Appr. precalc time on 68000:  %7d seconds" % int(total_inst_time + 0.5)
+print "Music duration:               %7d vblanks (%d:%02d)" % (musiclength, (musiclength + 25) / 3000, (musiclength + 25) % 3000 / 50)
+print "Number of different note IDs:   %5d" % note_id
+print "Number of different data words: %5d" % len(dataset)
 print
 n_errors += len(reported_errors)
 if n_errors == 0:
