@@ -204,7 +204,7 @@ programs = {
 					val = val * note.amp / 32768
 					p = p - 1
 				end
-				val = math.floor(distort(val, note.fdist) / 128)
+				val = math.min(math.floor(distort(val, note.fdist) / 128), 127)
 
 				note.mpitch = math.floor(note.mpitch * note.mpitchdecay) / 65536
 				note.bpitch = math.floor(note.bpitch * note.bpitchdecay) / 65536
