@@ -195,7 +195,7 @@ for p in module.positions[:module.songlength]:
 					period[t] = periodtable[0]
 				slide = -tr.arg if tr.cmd == 0x1 else tr.arg
 				perioddata[t] += [max(periodtable[-1], min(period[t] + i * slide, periodtable[0])) for i in range(speed)]
-				period[t] = periodtable[-1]
+				period[t] = perioddata[t][-1]
 			elif tr.cmd in [0x3, 0x5]:
 				# Toneportamento
 				if tr.note is not None:
