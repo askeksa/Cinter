@@ -103,7 +103,10 @@ for p in module.positions[:module.songlength]:
 		startrow = 0
 		for t, tr, arg1, arg2 in row:
 			if tr.cmd == 0xF:
-				speed = tr.arg
+				if tr.arg != 0:
+					speed = tr.arg
+				else:
+					error("Unsupported stop (speed 0)", p, t, r)
 			if tr.cmd == 0xD:
 				patternbreak = True
 				startrow = arg1 * 10 + arg2
@@ -152,7 +155,11 @@ for p in module.positions[:module.songlength]:
 
 			# Offset data
 			if tr.cmd == 0x9:
-				offsetdata[t] += [tr.arg] + [0] * (speed - 1)
+				offset = tr.arg
+				if inst[t] != 0 and tr.note and offset * 128 >= module.instruments[inst[t]].length:
+					error("Offset beyond end of sample", p, t, r)
+					offset = (module.instruments[inst[t]].length - 1) / 128
+				offsetdata[t] += [offset] + [0] * (speed - 1)
 			else:
 				offsetdata[t] += [0] * speed
 
@@ -161,19 +168,27 @@ for p in module.positions[:module.songlength]:
 				period[t] = periodtable[tr.note]
 			if tr.cmd == 0x0 and tr.arg != 0:
 				# Arpeggio
-				note = max(i for i,p in enumerate(periodtable) if p >= period[t])
+				if period[t] == 0:
+					error("Arpeggio with no base note")
+					period[t] = periodtable[0]
+				note = min(i for i,p in enumerate(periodtable) if p <= period[t])
 				if periodtable[note] != period[t]:
-					error("Arpeggio after slide", p, t, r)
-				arp = [0, arg1, arg2]
+					error("Arpeggio with invalid base pitch (after slide)", p, t, r)
+				arpnotes = [note, note + arg1, note + arg2]
+				for a in [1,2]:
+					if arpnotes[a] >= len(periodtable):
+						error("Arpeggio note above B-3")
+						arpnotes[a] = len(periodtable)-1
 				for i in range(speed):
-					perioddata[t] += [periodtable[note + arp[i % 3]]]
+					perioddata[t] += [periodtable[arpnotes[i % 3]]]
 			elif tr.cmd in [0x1, 0x2]:
 				# Portamento
 				if period[t] == 0:
 					error("Portamento with no source", p, t, r)
+					period[t] = periodtable[0]
 				slide = -tr.arg if tr.cmd == 0x1 else tr.arg
-				perioddata[t] += [period[t] + i * slide for i in range(speed)]
-				period[t] += slide * (speed - 1)
+				perioddata[t] += [max(periodtable[-1], min(period[t] + i * slide, periodtable[0])) for i in range(speed)]
+				period[t] = periodtable[-1]
 			elif tr.cmd in [0x3, 0x5]:
 				# Toneportamento
 				if tr.note is not None:
@@ -182,8 +197,10 @@ for p in module.positions[:module.songlength]:
 					portamento_speed[t] = tr.arg
 				if period[t] == 0:
 					error("Toneportamento with no source", p, t, r)
+					period[t] = periodtable[0]
 				if portamento_target[t] == 0:
 					error("Toneportamento with no target", p, t, r)
+					portamento_target[t] = period[t]
 				if portamento_speed[t] == 0:
 					error("Toneportamento with no speed", p, t, r)
 				perioddata[t] += [period[t]]
@@ -195,9 +212,9 @@ for p in module.positions[:module.songlength]:
 					perioddata[t] += [period[t]]
 			else:
 				if tr.cmd == 0xE and arg1 == 0x1:
-					period[t] -= arg2
+					period[t] = max(period[t] - arg2, periodtable[-1])
 				if tr.cmd == 0xE and arg1 == 0x2:
-					period[t] += arg2
+					period[t] = min(period[t] + arg2, periodtable[0])
 				perioddata[t] += [period[t]] * speed
 
 		# Advance
@@ -260,11 +277,16 @@ total_inst_size = 0
 for i in inst_list:
 	inst = module.instruments[i]
 	try:
+		# Read parameters
 		p = [param(inst.name[pi*2+1:pi*2+3]) for pi in range(8)]
 		p += [param(inst.name[pi+17:pi+18]) for pi in range(4)]
 
+		# Length and repeat length
 		length = inst.length
-		if inst.repoffset == 0 and inst.replen == 1:
+		if length < 2:
+			print "Instrument %d is empty" % i
+			length = 2
+		if inst.repoffset == 0 and inst.replen in [0,1]:
 			replen = 0
 			while inst.samples[(length-1)*2:length*2] == "\0\0":
 				length -= 1
@@ -290,6 +312,7 @@ for i in inst_list:
 		inst_data  += struct.pack(">11H", length, replen, mpitch, mod, bpitch, attack, dist, decay, mpitchdecay, moddecay, bpitchdecay)
 	except ValueError:
 		print "Could not parse parameters for instrument %d" % i
+		inst_data  += struct.pack(">11H", 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
 inst_data = struct.pack(">h", len(inst_list)-1) + inst_data
 
@@ -317,6 +340,7 @@ for track in [3,2,1,0]:
 			note = periodtable.index(per)
 			data = 0x8000 | (note_ids[(inst,offset,note)] << NOTE_SHIFT) | (vol << VOLUME_SHIFT)
 			initial = False
+			pdper = 0
 		elif initial:
 			data = 0
 		else:
@@ -325,6 +349,7 @@ for track in [3,2,1,0]:
 			if per != pper and dper != pdper and per in periodtable:
 				note = periodtable.index(per)
 				data = ((NOTE_ABS_MASK | note) << NOTE_SHIFT) | (dvol << VOLUME_SHIFT)
+				pdper = 0
 			else:
 				if per - pper < -256 or per - pper > 255:
 					error("Slide value out of range (from %d to %d)" % (pper, per), pat, track, row)
