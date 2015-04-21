@@ -10,8 +10,8 @@ c_TrackSize	rs.w	1
 c_InstPointer	rs.l	1
 c_MusicPointer	rs.l	1
 c_MusicState	rs.l	4*3
-c_waitline	rs.w	1
 c_dma	rs.w	1
+c_waitline	rs.w	1
 c_Instruments	rs.l	32*2
 c_Sinus	rs.w	DEGREES
 c_SIZE	rs.w	0
@@ -242,20 +242,18 @@ CinterPlay1:
 	move.l	(a0)+,a1
 
 	; Turn off DMA for triggered channels
-	moveq.l	#0,d5
+	moveq.l	#0,d4
 	rept	4
 	move.w	(a1),d0
 	add.w	d1,a1
 	add.w	d0,d0
-	addx.w	d5,d5
+	addx.w	d4,d4
 	endr
-	move.w	d5,$096(a3)
+	move.w	d4,$096(a3)
 
 	; Save line and dma
-	move.w	$006(a3),d4
-	add.w	#$0780,d4
-	or.w	#$8000,d5
-	movem.w	d4/d5,c_waitline-(c_MusicPointer+4)(a0)
+	move.w	$006(a3),d5
+	movem.w	d4/d5,c_dma-(c_MusicPointer+4)(a0)
 	rts
 
 CinterPlay2:
@@ -343,6 +341,7 @@ CinterPlay2:
 	add.w	d5,d5
 	add.w	d5,a4
 .write:
+	; Save period and volume
 	move.l	d2,(a0)+
 
 	; Write to audio registers
@@ -352,13 +351,15 @@ CinterPlay2:
 	move.l	a4,-(a3)	; Pointer
 	dbf	d7,.channelloop
 
-	; Wait for DMA to stop
-	lea.l	$dff000,a3
+	; Wait for old DMA to stop, then start new DMA
 	move.w	(a0)+,d4
-.dmawait:	cmp.w	$006(a3),d4
+	beq.b	.nodma
+	or.w	#$8000,d4
+	move.w	(a0)+,d5
+	add.w	#$0780,d5
+	lea.l	$dff000,a3
+.dmawait:	cmp.w	$006(a3),d5
 	bgt.b	.dmawait
-
-	; Turn on DMA
-	move.w	(a0)+,$096(a3)
+	move.w	d4,$096(a3)
+.nodma:
 	rts
-
