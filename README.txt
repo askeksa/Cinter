@@ -157,3 +157,17 @@ intro must exit before the music reaches its end or the replayer will
 play random garbage from memory. If you want extra silence at the end,
 you must add empty patterns as appropriate.
 
+
+ACKNOWLEDGEMENTS
+
+Cinter is developed by Aske Simon Christensen, aka Blueberry.
+
+For questions, suggestions or other comments, write to blueberry at
+loonies dot dk, or post to the Amiga Demoscene Archive forum thread at:
+
+http://ada.untergrund.net/?p=boardthread&id=953
+
+Thanks to Hoffman, Curt Cool, Wasp and Super-Hans for trying out the synth
+during its development and showing its worth.
+
+Cinter may be freely used and modified. Appropriate credit is appreciated.
