@@ -90,7 +90,7 @@ Sample repeat must be either absent (offset 0, length 2) or placed at the very
 end of the (possibly shortened) sample.
 
 Support for effect commands are as follows:
-0     (arpeggio)      Supported
+0     (arpeggio)      Supported as long as the base pitch matches a pure note.
 1,2,3 (portamento)    Supported, but only for slide values 00-3F and C0-FF.
 4,6   (vibrato)       Not supported
 5,A   (volume slide)  Supported*
@@ -120,13 +120,14 @@ F     (speed)         Only vblank timing supported. F00 (stop) not supported.
 THE CONVERSION SCRIPT
 
 Run the ProtrackerConvert.py script with two arguments: your module, and the
-output file.
+binary output file.
 
 The script will let you know if the module contains any violations of the
 restrictions mentioned in the previous section, or other nonsensical
 constructs.
 
-If successful, it will write a binary file for inclusion into the intro.
+Even in case of errors, the conversion will run through, but errors are an
+indication that something will probably not sound right.
 
 
 THE REPLAYER
