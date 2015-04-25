@@ -79,6 +79,7 @@ period = [0,0,0,0]
 volume = [0,0,0,0]
 portamento_target = [0,0,0,0]
 portamento_speed = [0,0,0,0]
+offset_value = [0,0,0,0]
 
 periodtable = [
 	856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,
@@ -162,7 +163,11 @@ for p in module.positions[:module.songlength]:
 
 			# Offset data
 			if tr.cmd == 0x9:
-				offset = tr.arg
+				if tr.arg != 0:
+					offset_value[t] = tr.arg
+				elif offset_value[t] == 0:
+					error("No previous offset", p, t, r)
+ 				offset = offset_value[t]
 				if inst[t] != 0 and tr.note and offset * 128 >= module.instruments[inst[t]].length:
 					error("Offset beyond end of sample", p, t, r)
 					offset = (module.instruments[inst[t]].length - 1) / 128
@@ -267,6 +272,10 @@ for inst in inst_list:
 			for n in range(note_min, note_max+1):
 				note_ids[(inst,offset,n)] = note_id
 				note_id += 1
+
+if node_id > 512:
+	print "More than 512 different note IDs!"
+	n_errors += 1
 
 
 # Export note ranges
