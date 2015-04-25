@@ -116,6 +116,14 @@ F     (speed)         Only vblank timing supported. F00 (stop) not supported.
 
 *: All volumes (0-64) are supported, but volume 64 will be played as 63.
 
+The converter will assign different note IDs to different combinations of
+instrument, tone and sampleoffset. Each note is represented in the music data
+by its note ID.
+
+The total number of note IDs needed for a song is computed like this: sum the
+number of tones between the lowest and highest note (both included) for each
+instrument / sampleoffset combination. This number must be at most 512.
+
 
 THE CONVERSION SCRIPT
 
