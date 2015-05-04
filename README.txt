@@ -145,7 +145,7 @@ important routines to know about:
 
 CinterInit:
   Computes the samples and sets up the player state.
-  A 7MHz 68000 can typically compute 5-7k of sample data per second,
+  A 7MHz 68000 can typically compute 2-6k of sample data per second,
   depending on the values of the distortion and vpower parameters
   (higher parameter values result in slower computation).
 
