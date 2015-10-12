@@ -100,13 +100,14 @@ programs = {
 				return math.floor(v * 100 + 0.5)
 			end
 			function ps(v, width)
-				if v == 1.0 then
-					return string.rep("X", width)
-				end
 				if width == 1 then
-					return string.format("%01d", math.floor(v * 10 + 0.5))
+					local p = math.floor(v * 10 + 0.5)
+					if p == 10 then return "X" end
+					return string.format("%01d", p)
 				else
-					return string.format("%02d", math.floor(v * 100 + 0.5))
+					local p = math.floor(v * 100 + 0.5)
+					if p == 100 then return "XX" end
+					return string.format("%02d", p)
 				end
 			end
 
