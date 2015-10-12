@@ -1,7 +1,7 @@
 ;              T         T               T
 
 
-DEGREES	=	16384
+CINTER_DEGREES	=	16384
 
 	rsreset
 c_SampleState	rs.l	3
@@ -13,7 +13,7 @@ c_MusicState	rs.l	4*3
 c_dma	rs.w	1
 c_waitline	rs.w	1
 c_Instruments	rs.l	32*2
-c_Sinus	rs.w	DEGREES
+c_Sinus	rs.w	CINTER_DEGREES
 c_SIZE	rs.w	0
 
 
@@ -22,10 +22,10 @@ CinterInit:
 	; A4 = Instrument space
 	; A6 = Cinter working memory
 
-MakeSinus:
+CinterMakeSinus:
 	lea	c_Sinus(a6),a0
 	addq.l	#2,a0
-	lea.l	DEGREES/2*2-2(a0),a1
+	lea.l	CINTER_DEGREES/2*2-2(a0),a1
 
 	moveq.l	#1,d7
 .loop:
@@ -49,19 +49,19 @@ MakeSinus:
 	move.w	d0,(a0)+
 	move.w	d0,-(a1)
 	neg.w	d0
-	move.w	d0,DEGREES/2*2-2(a0)
-	move.w	d0,DEGREES/2*2(a1)
+	move.w	d0,CINTER_DEGREES/2*2-2(a0)
+	move.w	d0,CINTER_DEGREES/2*2(a1)
 
 	addq.w	#1,d7
-	cmp.w	#DEGREES/4,d7
+	cmp.w	#CINTER_DEGREES/4,d7
 	blt.b	.loop
 
 	move.w	#16384,d0
 	move.w	d0,(a0)+
 	move.w	d0,-(a1)
 	neg.w	d0
-	move.w	d0,DEGREES/2*2-2(a0)
-	move.w	d0,DEGREES/2*2(a1)
+	move.w	d0,CINTER_DEGREES/2*2-2(a0)
+	move.w	d0,CINTER_DEGREES/2*2(a1)
 
 ; Sample parameters:
 ; short length, replength
@@ -83,7 +83,7 @@ LONGMUL	macro
 	add.l	d1,d0
 	endm
 
-MakeInstruments:
+CinterMakeInstruments:
 	lea	c_Sinus(a6),a0
 	lea	c_Instruments(a6),a5
 
@@ -201,7 +201,7 @@ MakeInstruments:
 	move.l	a3,a2
 	dbf	d7,.instrumentloop
 
-ComputePeriods:
+CinterComputePeriods:
 ;	lea	c_PeriodTable(a6),a1
 	move.w	#$e2b3,d0
 	move.l	#$0fc0fd20,d2
@@ -216,7 +216,7 @@ ComputePeriods:
 	move.w	d1,(a1)+
 	dbf	d7,.loop1
 
-ParseMusic:
+CinterParseMusic:
 ;	lea	c_TrackSize(a6),a1
 	move.w	(a2)+,(a1)+
 	move.w	(a2)+,d0
@@ -269,6 +269,7 @@ CinterPlay2:
 
 	; Write to audio registers
 	lea.l	$0e0(a3),a3
+	clr.l	d5
 	moveq.l	#4-1,d7
 .channelloop:
 	move.l	(a0)+,d3
@@ -339,7 +340,7 @@ CinterPlay2:
 	move.l	(a5),a4
 	sub.w	d5,d3
 	add.w	d5,d5
-	add.w	d5,a4
+	add.l	d5,a4
 .write:
 	; Save period and volume
 	move.l	d2,(a0)+
