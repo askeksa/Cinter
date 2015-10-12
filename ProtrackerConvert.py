@@ -181,7 +181,7 @@ for p in module.positions[:module.songlength]:
 			if tr.cmd == 0x0 and tr.arg != 0:
 				# Arpeggio
 				if period[t] == 0:
-					error("Arpeggio with no base note")
+					error("Arpeggio with no base note", p, t, r)
 					period[t] = periodtable[0]
 				note = min(i for i,p in enumerate(periodtable) if p <= period[t])
 				if periodtable[note] != period[t]:
@@ -189,7 +189,7 @@ for p in module.positions[:module.songlength]:
 				arpnotes = [note, note + arg1, note + arg2]
 				for a in [1,2]:
 					if arpnotes[a] >= len(periodtable):
-						error("Arpeggio note above B-3")
+						error("Arpeggio note above B-3", p, t, r)
 						arpnotes[a] = len(periodtable)-1
 				for i in range(speed):
 					perioddata[t] += [periodtable[arpnotes[i % 3]]]
@@ -273,7 +273,7 @@ for inst in inst_list:
 				note_ids[(inst,offset,n)] = note_id
 				note_id += 1
 
-if node_id > 512:
+if note_id > 512:
 	print "More than 512 different note IDs!"
 	n_errors += 1
 
@@ -331,7 +331,7 @@ for track in [3,2,1,0]:
 
 # Export instrument parameters
 def param(s):
-	if s == "X" * len(s):
+	if s.upper() == "X" * len(s):
 		return pow(10, len(s))
 	return int(s)
 
