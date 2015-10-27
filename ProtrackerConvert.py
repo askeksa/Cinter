@@ -73,7 +73,7 @@ offsetdata = [[],[],[],[]]
 posdata = []
 vblank = 0
 
-speed = 6
+musicspeed = 6
 inst = [0,0,0,0]
 period = [0,0,0,0]
 volume = [0,0,0,0]
@@ -96,25 +96,31 @@ def error(msg, p, t, r):
 startrow = 0
 restart = 0
 stopped = False
+skip = False
 for p in module.positions[:module.songlength]:
 	pat = module.patterns[p]
 	for r in range(startrow, 64):
+		if skip:
+			# Weird Protracker bug
+			skip = False
+			continue
 		row = [(t, tr, tr.arg >> 4, tr.arg & 0xF) for t, tr in enumerate(pat[r])]
 
 		# Check for unsupported commands
 		for t, tr, arg1, arg2 in row:
 			if tr.cmd in [0x4, 0x6, 0x7, 0xB]:
 				error("Unsupported command %X" % tr.cmd, p, t, r)
-			if tr.cmd == 0xE and arg1 in [0x0, 0x3, 0x4, 0x5, 0x6, 0x7, 0xD, 0xE, 0xF]:
+			if tr.cmd == 0xE and arg1 in [0x0, 0x3, 0x4, 0x5, 0x6, 0x7, 0xD, 0xF]:
 				error("Unsupported command E%X" % arg1, p, t, r)
 
 		# Pick up speed and break
 		patternbreak = False
 		startrow = 0
+		patterndelay = 0
 		for t, tr, arg1, arg2 in row:
 			if tr.cmd == 0xF:
 				if tr.arg != 0:
-					speed = tr.arg
+					musicspeed = tr.arg
 				else:
 					stopped = True
 			if tr.cmd == 0xD:
@@ -123,6 +129,12 @@ for p in module.positions[:module.songlength]:
 				if startrow > 63:
 					error("Break to position outside pattern", p, t, r)
 					startrow = 0
+			if tr.cmd == 0xE and arg1 == 0xE:
+				patterndelay = arg2
+		speed = musicspeed * (patterndelay + 1)
+		if patterndelay > 0 and patternbreak:
+			# Weird Protracker bug
+			skip = True
 		if stopped:
 			speed = 1
 			patternbreak = True
@@ -133,7 +145,7 @@ for p in module.positions[:module.songlength]:
 				volume[t] = module.instruments[tr.inst].volume
 			if tr.cmd == 0xC:
 				volume[t] = tr.arg
-			if tr.cmd == 0xE and arg1 == 0xC and arg2 < speed:
+			if tr.cmd == 0xE and arg1 == 0xC and arg2 < speed and arg2 < musicspeed:
 				volumedata[t] += [volume[t]] * arg2 + [0] * (speed - arg2)
 				volume[t] = 0
 			elif tr.cmd == 0x5 or tr.cmd == 0xA:
@@ -197,7 +209,7 @@ for p in module.positions[:module.songlength]:
 						error("Arpeggio note above B-3", p, t, r)
 						arpnotes[a] = len(periodtable)-1
 				for i in range(speed):
-					perioddata[t] += [periodtable[arpnotes[i % 3]]]
+					perioddata[t] += [periodtable[arpnotes[(i % musicspeed) % 3]]]
 			elif tr.cmd in [0x1, 0x2]:
 				# Portamento
 				if period[t] == 0:
