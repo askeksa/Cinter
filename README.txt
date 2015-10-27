@@ -112,7 +112,7 @@ EC    (notecut)       Supported
 ED    (notedelay)     Not supported
 EE    (patterndelay)  Not supported
 EF    (invert loop)   Not supported
-F     (speed)         Only vblank timing supported. F00 (stop) not supported.
+F     (speed)         Only vblank timing supported.
 
 *: All volumes (0-64) are supported, but volume 64 will be played as 63.
 
@@ -160,10 +160,10 @@ CinterPlay2:
   Waits until enough time has passed since previously playing samples
   were stopped (7.5 rasterlines), then triggers the new samples.
 
-The replayer does not stop automatically at the end of the music. The
-intro must exit before the music reaches its end or the replayer will
-play random garbage from memory. If you want extra silence at the end,
-you must add empty patterns as appropriate.
+At the end of the music, the player behaves just as when playing the module
+in Protracker: If the module contains an F00 command (stop), the music will
+stop when reaching this command. Otherwise, it will restart from the
+beginning when it reaches the end of the last pattern.
 
 
 ACKNOWLEDGEMENTS

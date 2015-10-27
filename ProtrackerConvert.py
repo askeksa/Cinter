@@ -94,6 +94,8 @@ def error(msg, p, t, r):
 	reported_errors.add((msg, p, t, r))
 
 startrow = 0
+restart = 0
+stopped = False
 for p in module.positions[:module.songlength]:
 	pat = module.patterns[p]
 	for r in range(startrow, 64):
@@ -114,13 +116,16 @@ for p in module.positions[:module.songlength]:
 				if tr.arg != 0:
 					speed = tr.arg
 				else:
-					error("Unsupported stop (speed 0)", p, t, r)
+					stopped = True
 			if tr.cmd == 0xD:
 				patternbreak = True
 				startrow = arg1 * 10 + arg2
 				if startrow > 63:
 					error("Break to position outside pattern", p, t, r)
 					startrow = 0
+		if stopped:
+			speed = 1
+			patternbreak = True
 
 		for t, tr, arg1, arg2 in row:
 			# Volume data
@@ -234,8 +239,9 @@ for p in module.positions[:module.songlength]:
 		vblank += speed
 		if patternbreak:
 			break
-
-musiclength = vblank
+	if stopped:
+		restart = vblank
+		break
 
 
 # Find note ranges and count notes per instrument
@@ -278,20 +284,14 @@ if note_id > 512:
 	n_errors += 1
 
 
-# Export note ranges
-note_range_data = ""
-for note_min,note_max,offset in note_range_list:
-	note_range_data += struct.pack(">BBH", note_min, note_max - note_min + 1, offset * 128)
-
-
 # Export notes
 VOLUME_SHIFT = 9
 NOTE_SHIFT = 0
 NOTE_ABS_MASK = 0x80
 
-notes_data = ""
 dataset = set()
-for track in [3,2,1,0]:
+track_data = [[],[],[],[]]
+for track in range(4):
 	initial = True
 	pvol = 0
 	pper = 0
@@ -323,11 +323,29 @@ for track in [3,2,1,0]:
 					dper = 63
 				data = (dper << NOTE_SHIFT) | (dvol << VOLUME_SHIFT)
 				pdper = dper
-		notes_data += struct.pack(">H", data)
+		track_data[track].append(data)
 		dataset.add(data)
 		pvol = vol
 		pper = per
 
+	if stopped:
+		track_data[track].append(0)
+
+while restart > 0 and all(track_data[t][restart-1] == track_data[t][-1] for t in range(4)):
+	for t in range(4):
+		track_data[t].pop()
+	restart -= 1
+
+notes_data = ""
+for track in [3,2,1,0]:
+	notes_data += struct.pack(">%dH" % len(track_data[track]), *track_data[track])
+musiclength = len(notes_data) / 8
+
+# Export note ranges
+note_range_data = ""
+for note_min,note_max,offset in note_range_list:
+	note_range_data += struct.pack(">BBH", note_min, note_max - note_min + 1, offset * 128)
+note_range_data += struct.pack(">h", (restart - musiclength + 1) * 2)
 
 # Export instrument parameters
 def param(s):
@@ -407,7 +425,7 @@ inst_data = struct.pack(">h", len(inst_list)-1) + "".join(inst_data)
 # Write output file
 fout = open(output_file, "wb")
 fout.write(inst_data)
-fout.write(struct.pack(">HH", len(notes_data) / 4, len(note_range_data)))
+fout.write(struct.pack(">hh", len(notes_data) / 4, len(note_range_data)))
 fout.write(note_range_data)
 fout.write(notes_data)
 out_size = fout.tell()
@@ -418,6 +436,7 @@ print "Uncompressed music data size: %7d bytes" % out_size
 print "Total instrument memory:      %7d bytes" % (total_inst_size * 2)
 print "Appr. precalc time on 68000:  %7d seconds" % int(total_inst_time + 0.5)
 print "Music duration:               %7d vblanks (%d:%02d)" % (musiclength, (musiclength + 25) / 3000, (musiclength + 25) % 3000 / 50)
+print "Restart position:             %7d vblanks (%d:%02d)" % (restart, (restart + 25) / 3000, (restart + 25) % 3000 / 50)
 print "Number of different note IDs:   %5d" % note_id
 print "Number of different data words: %5d" % len(dataset)
 print
