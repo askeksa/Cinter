@@ -110,7 +110,7 @@ E9    (retrig)        Supported
 EA,EB (finevolume)    Supported*
 EC    (notecut)       Supported
 ED    (notedelay)     Not supported
-EE    (patterndelay)  Not supported
+EE    (patterndelay)  Supported
 EF    (invert loop)   Not supported
 F     (speed)         Only vblank timing supported.
 
