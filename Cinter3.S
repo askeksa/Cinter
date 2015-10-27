@@ -9,6 +9,8 @@ c_PeriodTable	rs.w	36
 c_TrackSize	rs.w	1
 c_InstPointer	rs.l	1
 c_MusicPointer	rs.l	1
+c_MusicEnd	rs.l	1
+c_MusicLoop	rs.l	1
 c_MusicState	rs.l	4*3
 c_dma	rs.w	1
 c_waitline	rs.w	1
@@ -218,12 +220,17 @@ CinterComputePeriods:
 
 CinterParseMusic:
 ;	lea	c_TrackSize(a6),a1
-	move.w	(a2)+,(a1)+
+	move.w	(a2)+,d1
 	move.w	(a2)+,d0
+	move.w	d1,(a1)+
 	move.l	a2,(a1)+
 	add.w	d0,a2
 	move.l	a2,(a1)+
-
+	move.w	-(a2),d0
+	add.w	d1,a2
+	move.l	a2,(a1)+
+	add.w	d0,a2
+	move.l	a2,(a1)+
 CinterInitEnd:
 	rts
 
@@ -241,6 +248,13 @@ CinterPlay1:
 	move.l	(a0)+,a2
 	move.l	(a0)+,a1
 
+	; Loop when end is reached
+	cmp.l	(a0)+,a1
+	bls.b	.notend
+	move.l	(a0),a1
+	move.l	a1,-8(a0)
+.notend:
+
 	; Turn off DMA for triggered channels
 	moveq.l	#0,d4
 	rept	4
@@ -253,7 +267,7 @@ CinterPlay1:
 
 	; Save line and dma
 	move.w	$006(a3),d5
-	movem.w	d4/d5,c_dma-(c_MusicPointer+4)(a0)
+	movem.w	d4/d5,c_dma-c_MusicLoop(a0)
 	rts
 
 CinterPlay2:
@@ -266,6 +280,7 @@ CinterPlay2:
 	move.l	(a0)+,a2
 	move.l	(a0),a1
 	addq.l	#2,(a0)+
+	addq.l	#8,a0
 
 	; Write to audio registers
 	lea.l	$0e0(a3),a3
