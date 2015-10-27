@@ -81,6 +81,8 @@ portamento_target = [0,0,0,0]
 portamento_speed = [0,0,0,0]
 offset_value = [0,0,0,0]
 
+states = dict()
+
 periodtable = [
 	856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,
 	428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
@@ -96,19 +98,30 @@ def error(msg, p, t, r):
 startrow = 0
 restart = 0
 stopped = False
+looped = False
 skip = False
-for p in module.positions[:module.songlength]:
+pos = 0
+while not stopped and not looped:
+	p = module.positions[pos]
 	pat = module.patterns[p]
+	next_pos = pos + 1
+
 	for r in range(startrow, 64):
 		if skip:
 			# Weird Protracker bug
 			skip = False
 			continue
+		state = (pos,r,musicspeed,tuple(inst),tuple(period),tuple(volume),tuple(portamento_target),tuple(portamento_speed),tuple(offset_value))
+		if state in states:
+			restart = states[state]
+			looped = True
+			break
+		states[state] = vblank
 		row = [(t, tr, tr.arg >> 4, tr.arg & 0xF) for t, tr in enumerate(pat[r])]
 
 		# Check for unsupported commands
 		for t, tr, arg1, arg2 in row:
-			if tr.cmd in [0x4, 0x6, 0x7, 0xB]:
+			if tr.cmd in [0x4, 0x6, 0x7]:
 				error("Unsupported command %X" % tr.cmd, p, t, r)
 			if tr.cmd == 0xE and arg1 in [0x0, 0x3, 0x4, 0x5, 0x6, 0x7, 0xD, 0xF]:
 				error("Unsupported command E%X" % arg1, p, t, r)
@@ -129,6 +142,9 @@ for p in module.positions[:module.songlength]:
 				if startrow > 63:
 					error("Break to position outside pattern", p, t, r)
 					startrow = 0
+			if tr.cmd == 0xB:
+				patternbreak = True
+				next_pos = tr.arg
 			if tr.cmd == 0xE and arg1 == 0xE:
 				patterndelay = arg2
 		speed = musicspeed * (patterndelay + 1)
@@ -138,6 +154,7 @@ for p in module.positions[:module.songlength]:
 		if stopped:
 			speed = 1
 			patternbreak = True
+			restart = vblank + 1
 
 		for t, tr, arg1, arg2 in row:
 			# Volume data
@@ -251,10 +268,10 @@ for p in module.positions[:module.songlength]:
 		vblank += speed
 		if patternbreak:
 			break
-	if stopped:
-		restart = vblank
-		break
 
+	pos = next_pos
+	if pos >= module.songlength:
+		pos = 0
 
 # Find note ranges and count notes per instrument
 minmax_note = dict()

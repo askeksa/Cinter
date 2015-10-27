@@ -96,7 +96,7 @@ Support for effect commands are as follows:
 5,A   (volume slide)  Supported*
 7     (tremolo)       Not supported
 9     (sampleoffset)  Supported
-B     (positionjump)  Not supported
+B     (positionjump)  Supported
 C     (volume)        Supported*
 D     (patternbreak)  Supported
 E0    (filter)        Not supported
@@ -163,7 +163,8 @@ CinterPlay2:
 At the end of the music, the player behaves just as when playing the module
 in Protracker: If the module contains an F00 command (stop), the music will
 stop when reaching this command. Otherwise, it will restart from the
-beginning when it reaches the end of the last pattern.
+beginning when it reaches the end of the last pattern. The B command can be
+used to produce other looping behavior as desired.
 
 
 ACKNOWLEDGEMENTS
