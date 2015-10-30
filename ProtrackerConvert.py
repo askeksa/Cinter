@@ -123,7 +123,7 @@ while not stopped and not looped:
 		for t, tr, arg1, arg2 in row:
 			if tr.cmd in [0x4, 0x6, 0x7]:
 				error("Unsupported command %X" % tr.cmd, p, t, r)
-			if tr.cmd == 0xE and arg1 in [0x0, 0x3, 0x4, 0x5, 0x6, 0x7, 0xD, 0xF]:
+			if tr.cmd == 0xE and arg1 in [0x0, 0x3, 0x4, 0x5, 0x6, 0x7, 0xF]:
 				error("Unsupported command E%X" % arg1, p, t, r)
 
 		# Pick up speed and break
@@ -161,11 +161,14 @@ while not stopped and not looped:
 			if tr.inst != 0:
 				volume[t] = module.instruments[tr.inst].volume
 			if tr.cmd == 0xC:
+				# Set volume
 				volume[t] = tr.arg
 			if tr.cmd == 0xE and arg1 == 0xC and arg2 < speed and arg2 < musicspeed:
+				# Notecut
 				volumedata[t] += [volume[t]] * arg2 + [0] * (speed - arg2)
 				volume[t] = 0
 			elif tr.cmd == 0x5 or tr.cmd == 0xA:
+				# Volumeslide
 				if arg1:
 					slide = arg1
 				else:
@@ -174,8 +177,10 @@ while not stopped and not looped:
 				volume[t] = volumedata[t][-1]
 			else:
 				if tr.cmd == 0xE and arg1 == 0xA:
+					# Finevolume up
 					volume[t] = min(volume[t] + arg2, 64)
 				if tr.cmd == 0xE and arg1 == 0xB:
+					# Finevolume down
 					volume[t] = max(0, volume[t] - arg2)
 				volumedata[t] += [volume[t]] * speed
 
@@ -184,13 +189,24 @@ while not stopped and not looped:
 				if tr.inst != inst[t] and tr.cmd in [0x3, 0x5]:
 					error("Instrument change on toneportamento", p, t, r)
 				inst[t] = tr.inst
-			if tr.cmd == 0xE and arg1 == 0x9 and arg2 != 0:
+			if inst[t] == 0:
+				if tr.note is not None or (tr.cmd == 0xE and arg1 == 0x9 and arg2 != 0):
+					error("Note with no instrument", p, t, r)
+				notedata[t] += [0] * speed
+			elif tr.cmd == 0xE and arg1 == 0x9 and arg2 != 0:
+				# Retrig note
 				for i in range(speed):
 					if (i % arg2) == 0:
 						notedata[t] += [inst[t]]
 					else:
 						notedata[t] += [0]
-			elif inst[t] != 0 and tr.note is not None and tr.cmd not in [0x3, 0x5]:
+			elif tr.note is not None and tr.cmd == 0xE and arg1 == 0xD:
+				# Notedelay
+				if arg2 < speed and arg2 < musicspeed:
+					notedata[t] += [0] * arg2 + [inst[t]] + [0] * (speed - arg2 - 1)
+				else:
+					notedata[t] += [0] * speed
+			elif tr.note is not None and tr.cmd not in [0x3, 0x5]:
 				notedata[t] += [inst[t]] + [0] * (speed - 1)
 			else:
 				notedata[t] += [0] * speed
@@ -210,7 +226,7 @@ while not stopped and not looped:
 				offsetdata[t] += [0] * speed
 
 			# Period data
-			if tr.note is not None and tr.cmd not in [0x3, 0x5]:
+			if tr.note is not None and tr.cmd not in [0x3, 0x5] and not (tr.cmd == 0xE and arg1 == 0xD):
 				period[t] = periodtable[tr.note]
 			if tr.cmd == 0x0 and tr.arg != 0:
 				# Arpeggio
@@ -256,16 +272,30 @@ while not stopped and not looped:
 					else:
 						period[t] = max(period[t] - portamento_speed[t], portamento_target[t])
 					perioddata[t] += [period[t]]
+			elif tr.note is not None and tr.cmd == 0xE and arg1 == 0xD:
+				# Notedelay
+				if arg2 < speed and arg2 < musicspeed:
+					perioddata[t] += [period[t]] * arg2 + [periodtable[tr.note]] * (speed - arg2)
+				else:
+					perioddata[t] += [period[t]] * speed
+				period[t] = periodtable[tr.note]
 			else:
 				if tr.cmd == 0xE and arg1 == 0x1:
+					# Fineslide up
 					period[t] = max(period[t] - arg2, periodtable[-1])
 				if tr.cmd == 0xE and arg1 == 0x2:
+					# Fineslide down
 					period[t] = min(period[t] + arg2, periodtable[0])
 				perioddata[t] += [period[t]] * speed
 
 		# Advance
 		posdata += [(p,r)] * speed
 		vblank += speed
+		assert len(volumedata[t]) == vblank
+		assert len(notedata[t]) == vblank
+		assert len(offsetdata[t]) == vblank
+		assert len(perioddata[t]) == vblank
+
 		if patternbreak:
 			break
 
