@@ -109,7 +109,7 @@ E7    (trem control)  Not supported
 E9    (retrig)        Supported
 EA,EB (finevolume)    Supported*
 EC    (notecut)       Supported
-ED    (notedelay)     Supported, including Protracker 2.3 quirk
+ED    (notedelay)     Supported
 EE    (patterndelay)  Supported
 EF    (invert loop)   Not supported
 F     (speed)         Only vblank timing supported.
@@ -136,6 +136,9 @@ constructs.
 
 Even in case of errors, the conversion will run through, but errors are an
 indication that something will probably not sound right.
+
+The converter tries to emulate all quirks of Protracker 2.3d and might not be
+fully compatible with other versions.
 
 
 THE REPLAYER
@@ -165,6 +168,20 @@ in Protracker: If the module contains an F00 command (stop), the music will
 stop when reaching this command. Otherwise, it will restart from the
 beginning when it reaches the end of the last pattern. The B command can be
 used to produce other looping behavior as desired.
+
+
+VERSION HISTORY
+
+2015-04-21: First public version.
+
+2015-05-19: Fixed conversion of 9 command with argument 00.
+
+2015-10-31: Fixed replay of 9 command with argument >= 80.
+            Support conversion of lowercase sample names.
+            Fixed bug in sample name generation in the Lua synth.
+            Support stopping or restarting at the end of the music.
+            Added support for F command with argument 00 (stop).
+            Added converter support for commands B, ED and EE.
 
 
 ACKNOWLEDGEMENTS
