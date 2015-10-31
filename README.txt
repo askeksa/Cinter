@@ -109,7 +109,7 @@ E7    (trem control)  Not supported
 E9    (retrig)        Supported
 EA,EB (finevolume)    Supported*
 EC    (notecut)       Supported
-ED    (notedelay)     Not supported
+ED    (notedelay)     Supported, including Protracker 2.3 quirk
 EE    (patterndelay)  Supported
 EF    (invert loop)   Not supported
 F     (speed)         Only vblank timing supported.
