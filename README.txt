@@ -100,7 +100,7 @@ B     (positionjump)  Supported
 C     (volume)        Supported*
 D     (patternbreak)  Supported
 E0    (filter)        Not supported
-E1,E2 (fineslide)     Supported
+E1,E2 (fineslide)     Supported, except directly on notes.
 E3    (glissando)     Not supported
 E4    (vibr control)  Not supported
 E5    (finetune)      Not supported
