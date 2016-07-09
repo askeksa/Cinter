@@ -427,7 +427,7 @@ for i in range(1, last_nonempty_inst + 1):
 	# General statistics
 	index = inst_list.index(i)
 	min_note = min(note_min for ((inst,offset),(note_min,note_max)) in minmax_note.iteritems() if inst == i)
-	max_note = min(note_max for ((inst,offset),(note_min,note_max)) in minmax_note.iteritems() if inst == i)
+	max_note = max(note_max for ((inst,offset),(note_min,note_max)) in minmax_note.iteritems() if inst == i)
 	offsets = sum(1 for inst,offset in minmax_note if inst == i)
 	msg = ""
 
