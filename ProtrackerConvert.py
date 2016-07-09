@@ -436,18 +436,19 @@ for i in range(1, last_nonempty_inst + 1):
 	index = inst_list.index(i)
 	min_note = min(note_min for ((inst,offset),(note_min,note_max)) in minmax_note.iteritems() if inst == i)
 	max_note = max(note_max for ((inst,offset),(note_min,note_max)) in minmax_note.iteritems() if inst == i)
-	offsets = sum(1 for inst,offset in minmax_note if inst == i)
+	offsets = [offset for oi,offset in minmax_note if oi == i]
 	n_note_ids = note_id_start[index+1] - note_id_start[index]
 	msg = ""
 
 	# Length and repeat length
 	length = inst.length
-	if length < 2:
+	if length < 1:
 		msg = "Empty!"
-		length = 2
+		length = 1
 	if inst.repoffset == 0 and inst.replen in [0,1]:
 		replen = 0
-		while inst.samples[(length-1)*2:length*2] == "\0\0":
+		max_offset = max(offsets) * 128
+		while length > max_offset and inst.samples[(length-1)*2:length*2] == "\0\0":
 			length -= 1
 	else:
 		replen = inst.replen
@@ -481,7 +482,7 @@ for i in range(1, last_nonempty_inst + 1):
 
 	print "%02d  %-22s %6d %6s   %2d %5d  %3s  %3s %3d  %3d  %s" % (
 		i, inst.name, length * 2, "" if not replen else replen * 2, index, inst_counts[i],
-		notename(min_note), notename(max_note), offsets - 1, n_note_ids, msg
+		notename(min_note), notename(max_note), len(offsets) - 1, n_note_ids, msg
 	)
 
 	if msg != "":
