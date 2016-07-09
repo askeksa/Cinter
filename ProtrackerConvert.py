@@ -131,7 +131,11 @@ while not stopped and not looped:
 		for t, tr, cmd, arg1, arg2 in row:
 			if cmd == 0xF:
 				if tr.arg != 0:
-					musicspeed = tr.arg
+					if tr.arg < 0x20:
+						musicspeed = tr.arg
+					else:
+						if tr.arg != 125:
+							error("Tempo set", p, t, r)
 				else:
 					stopped = True
 			if cmd == 0xD:
