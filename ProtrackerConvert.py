@@ -331,6 +331,7 @@ inst_list.sort(key=(lambda i : inst_counts[i]), reverse=True)
 note_id = 0
 note_ids = dict()
 note_range_list = []
+note_id_start = [0]
 for inst in inst_list:
 	if (inst,0) not in minmax_note:
 		minmax_note[(inst,0)] = (0,0)
@@ -341,6 +342,7 @@ for inst in inst_list:
 			for n in range(note_min, note_max+1):
 				note_ids[(inst,offset,n)] = note_id
 				note_id += 1
+	note_id_start.append(note_id)
 
 if note_id > 512:
 	print "More than 512 different note IDs!"
@@ -421,7 +423,7 @@ total_inst_size = 0
 total_inst_time = 1.0
 last_nonempty_inst = max(i for i in range(1, 32) if module.instruments[i].name.strip() != "")
 print
-print "    Name                   Length Repeat  Idx Count  Low High 9xx  Error?"
+print "    Name                   Length Repeat  Idx Count  Low High 9xx  IDs  Error?"
 for i in range(1, last_nonempty_inst + 1):
 	inst = module.instruments[i]
 
@@ -435,6 +437,7 @@ for i in range(1, last_nonempty_inst + 1):
 	min_note = min(note_min for ((inst,offset),(note_min,note_max)) in minmax_note.iteritems() if inst == i)
 	max_note = max(note_max for ((inst,offset),(note_min,note_max)) in minmax_note.iteritems() if inst == i)
 	offsets = sum(1 for inst,offset in minmax_note if inst == i)
+	n_note_ids = note_id_start[index+1] - note_id_start[index]
 	msg = ""
 
 	# Length and repeat length
@@ -476,10 +479,11 @@ for i in range(1, last_nonempty_inst + 1):
 		msg = "Parameter parse error!"
 		inst_data[index] = struct.pack(">11H", length, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
-	print "%02d  %-22s %6d %6s   %2d %5d  %3s  %3s %3d  %s" % (
+	print "%02d  %-22s %6d %6s   %2d %5d  %3s  %3s %3d  %3d  %s" % (
 		i, inst.name, length * 2, "" if not replen else replen * 2, index, inst_counts[i],
-		notename(min_note), notename(max_note), offsets - 1, msg
+		notename(min_note), notename(max_note), offsets - 1, n_note_ids, msg
 	)
+
 	if msg != "":
 		n_errors += 1
 
