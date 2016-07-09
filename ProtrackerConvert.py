@@ -229,6 +229,8 @@ while not stopped and not looped:
 
 			# Period data
 			if tr.note is not None and cmd not in [0x3, 0x5, 0xED]:
+				if cmd in [0xE1, 0xE2]:
+					error("Fineslide on note", p, t, r)
 				period[t] = periodtable[tr.note]
 			if cmd == 0x0 and tr.arg != 0:
 				# Arpeggio
@@ -282,10 +284,10 @@ while not stopped and not looped:
 					perioddata[t] += [period[t]] * speed
 				period[t] = periodtable[tr.note]
 			else:
-				if cmd == 0xE1:
+				if cmd == 0xE1 and tr.note is None:
 					# Fineslide up
 					period[t] = max(period[t] - arg2, periodtable[-1])
-				if cmd == 0xE2:
+				if cmd == 0xE2 and tr.note is None:
 					# Fineslide down
 					period[t] = min(period[t] + arg2, periodtable[0])
 				perioddata[t] += [period[t]] * speed
