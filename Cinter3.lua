@@ -80,7 +80,7 @@ function render(inputs, outputs, start, stop)
 end
 
 programs = {
-	ding = {
+	cinter3 = {
 		paramnames = {
 			"attack",
 			"decay",
