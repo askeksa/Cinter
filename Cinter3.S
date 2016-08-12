@@ -24,6 +24,9 @@ CinterInit:
 	; A4 = Instrument space
 	; A6 = Cinter working memory
 
+	; Raw instrument data must be copied to the start of the
+	; instrument space before or after CinterInit is called.
+
 CinterMakeSinus:
 	lea	c_Sinus(a6),a0
 	addq.l	#2,a0
@@ -91,6 +94,22 @@ CinterMakeInstruments:
 
 	; Loop through instruments
 	move.w	(a2)+,d7
+	bpl.b	.instrumentloop
+	not.w	d7
+	; Raw instruments
+.rawloop:
+	; Read length
+	clr.l	d5
+	move.w	(a2),d5
+	move.l	(a2)+,(a5)+
+	move.l	a4,(a5)+
+	add.l	d5,d5
+
+	add.l	d5,a4
+	dbf	d7,.rawloop
+
+	move.w	(a2)+,d7
+	; Generated instruments
 .instrumentloop:
 	; Read length
 	clr.l	d5

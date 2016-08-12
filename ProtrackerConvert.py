@@ -55,17 +55,47 @@ def printpattern(pat):
 			sys.stdout.write(" %3s %2X %1X %02X   " % (notename(tr.note), tr.inst, tr.cmd, tr.arg))
 		print
 
-
 n_errors = 0
+reported_errors = set()
+def error(msg, p, t, r):
+	if (msg, p, t, r) not in reported_errors:
+		print "%s in pattern %d track %d row %d" % (msg, p, t, r)
+	reported_errors.add((msg, p, t, r))
+
+
+# Commandline
 if len(sys.argv) <3:
-	print "Usage: %s <input module file> <output binary data file>" % sys.argv[0]
+	print "Usage: %s <input module file> <output binary data file> [<output raw instrument file>]" % sys.argv[0]
 	sys.exit(1)
 module_file = sys.argv[1]
 output_file = sys.argv[2]
+raw_inst_file = sys.argv[3] if len(sys.argv) > 3 else None
 
 print "Converting module file %s..." % module_file
 module = Module(open(module_file, "rb"))
 
+
+# Parse instrument parameters
+def param(s):
+	if s == "":
+		raise ValueError
+	if s.upper() == "X" * len(s):
+		return pow(10, len(s))
+	return int(s)
+
+inst_params = [None]
+for i in range(1, 32):
+	inst = module.instruments[i]
+	try:
+		# Read parameters
+		p = [param(inst.name[pi*2+1:pi*2+3]) for pi in range(8)]
+		p += [param(inst.name[pi+17:pi+18]) for pi in range(4)]
+		inst_params.append(p)
+	except ValueError:
+		inst_params.append(None)
+
+
+# Parse music data
 volumedata = [[],[],[],[]]
 notedata = [[],[],[],[]]
 perioddata = [[],[],[],[]]
@@ -88,12 +118,6 @@ periodtable = [
 	428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
 	214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113
 ]
-
-reported_errors = set()
-def error(msg, p, t, r):
-	if (msg, p, t, r) not in reported_errors:
-		print "%s in pattern %d track %d row %d" % (msg, p, t, r)
-	reported_errors.add((msg, p, t, r))
 
 startrow = 0
 restart = 0
@@ -307,6 +331,7 @@ while not stopped and not looped:
 	if pos >= module.songlength:
 		pos = 0
 
+
 # Find note ranges and count notes per instrument
 minmax_note = dict()
 inst_counts = [0] * 32
@@ -323,9 +348,11 @@ for track in range(4):
 			else:
 				minmax_note[(inst,offset)] = note,note
 
+
 # List of used instruments
 inst_list = [inst for inst in range(32) if inst_counts[inst] != 0]
-inst_list.sort(key=(lambda i : inst_counts[i]), reverse=True)
+inst_list.sort(key=(lambda i : 99999-i if inst_params[i] is None else inst_counts[i]), reverse=True)
+
 
 # Build note ID mapping table
 note_id = 0
@@ -413,23 +440,20 @@ for note_min,note_max,offset in note_range_list:
 note_range_data += struct.pack(">h", (restart - musiclength + 1) * 2)
 
 # Export instrument parameters
-def param(s):
-	if s.upper() == "X" * len(s):
-		return pow(10, len(s))
-	return int(s)
-
 inst_data = [""] * len(inst_list)
+raw_instruments = []
+raw_inst_size = 0
 total_inst_size = 0
 total_inst_time = 1.0
-last_nonempty_inst = max(i for i in range(1, 32) if module.instruments[i].name.strip() != "")
+last_nonempty_inst = max(i for i in range(1, 32) if module.instruments[i].name.strip() != "" or i in inst_list)
 print
-print "    Name                   Length Repeat  Idx Count  Low High 9xx  IDs  Error?"
+print "Inst Name                   Length Repeat Idx Count  Low High 9xx  IDs  Error?"
 for i in range(1, last_nonempty_inst + 1):
 	inst = module.instruments[i]
 
 	# Unused instrument?
 	if i not in inst_list:
-		print "%02d  %-22s" % (i, inst.name)
+		print "%02d   %-22s" % (i, inst.name)
 		continue
 
 	# General statistics
@@ -455,12 +479,10 @@ for i in range(1, last_nonempty_inst + 1):
 		if inst.repoffset != inst.length - inst.replen:
 			msg = "Repeat is not at end!"
 	total_inst_size += length
+	inst.length = length
 
-	try:
-		# Read parameters
-		p = [param(inst.name[pi*2+1:pi*2+3]) for pi in range(8)]
-		p += [param(inst.name[pi+17:pi+18]) for pi in range(4)]
-
+	p = inst_params[i]
+	if p is not None:
 		# Parameters on word form for synth code
 		attack      = 65536-int(math.floor(10000.0 / (1 + p[0] * p[0])))
 		decay       = int(math.floor(10000.0 / (1 + p[1] * p[1])))
@@ -476,31 +498,48 @@ for i in range(1, last_nonempty_inst + 1):
 
 		inst_data[index] = struct.pack(">11H", length, replen, mpitch, mod, bpitch, attack, dist, decay, mpitchdecay, moddecay, bpitchdecay)
 		total_inst_time += (20 + p[8] + p[9] + p[10] + p[11]) * length * 0.000017
-	except ValueError:
-		msg = "Parameter parse error!"
-		inst_data[index] = struct.pack(">11H", length, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+		inst_type = "C"
+	else:
+		inst_data[index] = struct.pack(">2H", length, replen)
+		raw_instruments.append(i)
+		raw_inst_size += length
+		inst_type = "R"
 
-	print "%02d  %-22s %6d %6s   %2d %5d  %3s  %3s %3d  %3d  %s" % (
-		i, inst.name, length * 2, "" if not replen else replen * 2, index, inst_counts[i],
+	print "%02d %c %-22s %6d %6s  %2d %5d  %3s  %3s %3d %4d  %s" % (
+		i, inst_type, inst.name, length * 2, "" if not replen else replen * 2, index, inst_counts[i],
 		notename(min_note), notename(max_note), len(offsets) - 1, n_note_ids, msg
 	)
 
 	if msg != "":
 		n_errors += 1
 
-inst_data = struct.pack(">h", len(inst_list)-1) + "".join(inst_data)
+insts_data = ""
+if len(raw_instruments) > 0:
+	insts_data += struct.pack(">h", -len(raw_instruments))
+	insts_data += "".join(inst_data[:len(raw_instruments)])
+insts_data += struct.pack(">h", len(inst_list)-len(raw_instruments)-1)
+insts_data += "".join(inst_data[len(raw_instruments):])
 
 # Write output file
 fout = open(output_file, "wb")
-fout.write(inst_data)
+fout.write(insts_data)
 fout.write(struct.pack(">hh", len(notes_data) / 4, len(note_range_data)))
 fout.write(note_range_data)
 fout.write(notes_data)
 out_size = fout.tell()
 fout.close()
 
+if raw_inst_file is not None:
+	fout = open(raw_inst_file, "wb")
+	for i in raw_instruments:
+		inst = module.instruments[i]
+		fout.write(inst.samples[:inst.length*2])
+	fout.close()
+
 print
 print "Uncompressed music data size: %7d bytes" % out_size
+if raw_inst_size > 0:
+	print "Total raw instrument size:    %7d bytes" % (raw_inst_size * 2)
 print "Total instrument memory:      %7d bytes" % (total_inst_size * 2)
 print "Appr. precalc time on 68000:  %7d seconds" % int(total_inst_time + 0.5)
 print "Music duration:               %7d vblanks (%d:%02d)" % (musiclength, (musiclength + 25) / 3000, (musiclength + 25) % 3000 / 50)
@@ -513,3 +552,10 @@ if n_errors == 0:
 	print "No errors."
 else:
 	print "%d error%s." % (n_errors, "s" if n_errors > 1 else "")
+
+if raw_inst_size > 0 and raw_inst_file is None:
+	print
+	print "Warning: Raw instruments used, but no raw instrument output file specified!"
+if raw_inst_size == 0 and raw_inst_file is not None:
+	print
+	print "Warning: Raw instrument output file specified, but no raw instruments used!"
