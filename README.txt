@@ -32,8 +32,8 @@ To use the synth, you need to follow these steps:
 6. Use these samples to make music in Protracker (or another tracker capable of
    saving in Protracker format).
 7. Run the ProtrackerConvert.py script on the Protracker module. It will output
-   a binary file to be included in your intro.
-8. Include the Cinter3.S source file and the binary output file from the
+   binary files to be included in your intro.
+8. Include the Cinter3.S source file and the binary output files from the
    conversion script in your intro and use them as prescribed.
 9. Profit. :)
 
@@ -71,12 +71,14 @@ You can easily convert back from a saved sample to the original parameters:
 
 PROTRACKER GUIDELINES
 
+You can use a combination of Cinter and non-Cinter ("raw") instruments in your
+module. The Cinter instruments are recognized by their special sample names.
 You may change the initial 's' in the sample names to a different character,
 but the sample names must be otherwise intact, in order to communicate the
 instrument parameters to the conversion script.
 
-You can write whatever you like in the names of unused instruments, so the
-traditional module info can be placed here.
+You can write whatever you like in the names of raw and unused instruments,
+so the traditional module info can be placed here.
 
 You are allowed to shorten instruments by changing their lengths or cutting
 from the end in the sample editor. The new length will be in effect, both in
@@ -127,8 +129,9 @@ instrument / sampleoffset combination. This number must be at most 512.
 
 THE CONVERSION SCRIPT
 
-Run the ProtrackerConvert.py script with two arguments: your module, and the
-binary output file.
+Run the ProtrackerConvert.py script with two or three arguments: your module,
+the binary songdata output file, and (if you are using any raw instruments)
+the raw sampledata output file.
 
 The script will let you know if the module contains any violations of the
 restrictions mentioned in the previous section, or other nonsensical
