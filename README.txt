@@ -186,6 +186,12 @@ VERSION HISTORY
             Added support for F command with argument 00 (stop).
             Added converter support for commands B, ED and EE.
 
+2016-08-13: Added support for raw samples.
+            Treat F command as speed/tempo (only tempo 125 allowed).
+            Disallow fineslide on note (never worked).
+            Fixed trimming of trailing silence.
+            Fixed printing of max note for instrument.
+
 
 ACKNOWLEDGEMENTS
 
