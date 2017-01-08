@@ -206,3 +206,5 @@ Thanks to Hoffman, Curt Cool, Wasp and Super-Hans for trying out the synth
 during its development and showing its worth.
 
 Cinter may be freely used and modified. Appropriate credit is appreciated.
+
+Example modules are copyright of their individual authors.
