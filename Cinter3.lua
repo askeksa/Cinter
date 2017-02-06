@@ -1,3 +1,4 @@
+-- MetaSynth module for Cinter synth
 
 local ffi = require("ffi")
 local bit = require("bit")

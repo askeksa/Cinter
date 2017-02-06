@@ -15,9 +15,8 @@ You will need:
 
 
 To use the synth, you need to follow these steps:
-1. Download MetaSynth.dll from https://bitbucket.org/askeksa/metasynth/downloads
-   (or use the one included in the Cinter distribution archive). This is a
-   generic VST which delegates the actual sound generation to a Lua program.
+1. Download MetaSynth.dll from https://github.com/askeksa/MetaSynth/releases
+   This is a generic VST which delegates the sound generation to a Lua program.
 2. Install the VST in your favorite VST host. For example, in Renoise, you need
    to place it in a directory mentioned under VST Plugins in the Plug/Misc
    settings. The VST host must provide a GUI for generic VST parameters which
