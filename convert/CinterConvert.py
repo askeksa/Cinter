@@ -15,6 +15,7 @@ class TrackRow:
 class Instrument:
 	def __init__(self, f):
 		self.name = f.read(22).rstrip('\0')
+		self.version = None if len(self.name) == 0 else 4 if self.name[0].isdigit() else 3
 		self.length, self.finetune, self.volume, self.repoffset, self.replen = struct.unpack(">HBBHH", f.read(8))
 		self.samples = None
 
@@ -481,17 +482,25 @@ for i in range(1, last_nonempty_inst + 1):
 	total_inst_size += length
 	inst.length = length
 
+	# Decay conversion
+	def decaycurve(v):
+		if inst.version >= 4:
+			v2 = float(v) / 50 - 1
+			return int(math.floor(0.5 + math.exp(0.0008 * v2 + 0.1 * math.pow(v2, 7)) * 65536)) & 0xffff
+		else:
+			return int(math.floor(math.exp(-0.000002 * v * v) * 65536)) & 0xffff
+
 	p = inst_params[i]
 	if p is not None:
 		# Parameters on word form for synth code
 		attack      = 65536-int(math.floor(10000.0 / (1 + p[0] * p[0])))
 		decay       = int(math.floor(10000.0 / (1 + p[1] * p[1])))
 		mpitch      = p[2] * 512
-		mpitchdecay = int(math.floor(math.exp(-0.000002 * p[3] * p[3]) * 65536)) & 0xffff
+		mpitchdecay = decaycurve(p[3])
 		bpitch      = p[4] * 512
-		bpitchdecay = int(math.floor(math.exp(-0.000002 * p[5] * p[5]) * 65536)) & 0xffff
+		bpitchdecay = decaycurve(p[5])
 		mod         = p[6]
-		moddecay    = int(math.floor(math.exp(-0.000002 * p[7] * p[7]) * 65536)) & 0xffff
+		moddecay    = decaycurve(p[7])
 
 		# Distortion parameters for synth code
 		dist = (p[8] << 12) | (p[9] << 8) | (p[10] << 4) | p[11]

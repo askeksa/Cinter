@@ -210,8 +210,11 @@ CinterMakeInstruments:
 	rept	3
 	move.l	(a1),d0
 	move.w	(a3)+,d2
-	beq.b	*+16
+	beq.b	*+22	; Optimization, can be omitted
 	LONGMUL
+	tst.w	d2
+	bmi.b	*+4
+	add.l	(a1),d0
 	move.l	d0,(a1)+
 	endr
 

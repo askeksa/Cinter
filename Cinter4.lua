@@ -111,16 +111,20 @@ programs = {
 					return string.format("%02d", p)
 				end
 			end
+			function decaycurve(value)
+				local v = p(value) / 50 - 1
+				return math.floor(0.5 + math.exp(0.0008 * v + 0.1 * math.pow(v, 7)) * 65536)
+			end
 
 			note = {
 				attack      = math.floor(10000 / (1 + p(params.attack) * p(params.attack))),
 				decay       = math.floor(10000 / (1 + p(params.decay)  * p(params.decay) )),
-				mpitch      = p(params.mpitch) * 512,
-				bpitch      = p(params.bpitch) * 512,
-				mod         = p(params.mod),
-				mpitchdecay = math.floor(math.exp(-0.000002 * p(params.mpitchdecay) * p(params.mpitchdecay)) * 65536),
-				bpitchdecay = math.floor(math.exp(-0.000002 * p(params.bpitchdecay) * p(params.bpitchdecay)) * 65536),
-				moddecay    = math.floor(math.exp(-0.000002 * p(params.moddecay)    * p(params.moddecay)   ) * 65536),
+				mpitch      = p(params.mpitch) * 512 * 65536,
+				bpitch      = p(params.bpitch) * 512 * 65536,
+				mod         = p(params.mod)          * 65536,
+				mpitchdecay = decaycurve(params.mpitchdecay),
+				bpitchdecay = decaycurve(params.bpitchdecay),
+				moddecay    = decaycurve(params.moddecay),
 				mdist       = math.floor(0.5 + params.mdist * 10),
 				bdist       = math.floor(0.5 + params.bdist * 10),
 				vpower      = math.floor(0.5 + params.vpower * 10),
@@ -159,7 +163,7 @@ programs = {
 					local filename
 					if note.tone == 52 then
 						-- Save with Protracker-compatible name
-						filename = string.format("s%s%s%s%s%s%s%s%s%s%s%s%s.raw",
+						filename = string.format("1%s%s%s%s%s%s%s%s%s%s%s%s.raw",
 							ps(params.attack, 2), ps(params.decay, 2),
 							ps(params.mpitch, 2), ps(params.mpitchdecay, 2),
 							ps(params.bpitch, 2), ps(params.bpitchdecay, 2),
@@ -169,7 +173,7 @@ programs = {
 					else
 						-- Save with a name to copy directly into asm data
 						local dist = note.mdist * 4096 + note.bdist * 256 + note.vpower * 16 + note.fdist
-						filename = string.format("sample_$%04x,$%04x,$%04x,$%04x,$%04x,$%04x,$%04x,$%04x,$%04x,$%04x.raw",
+						filename = string.format("cinter4_$%04x,$%04x,$%04x,$%04x,$%04x,$%04x,$%04x,$%04x,$%04x,$%04x.raw",
 							l / 2,
 							p(params.mpitch) * 512, p(params.mod), p(params.bpitch) * 512,
 							bit.band(-note.attack, 65535), dist, note.decay,
@@ -196,11 +200,12 @@ programs = {
 					end
 					return val
 				end
-				local mpitch = math.floor(note.mpitch * 16384) / 65536
-				local bpitch = math.floor(note.bpitch * 16384) / 65536
-				local mod = math.floor(note.mod * 16384) / 65536
-				local mval = distort(sintab(samindex * mpitch), note.mdist)
-				val = distort(sintab(samindex * bpitch + mval * mod), note.bdist)
+				function mul(v16, v32)
+					return math.floor(v16 * math.floor(v32 / 4) / 65536)
+				end
+
+				local mval = distort(sintab(mul(samindex, note.mpitch)), note.mdist)
+				local val = distort(sintab(mul(samindex, note.bpitch) + mul(mval, note.mod)), note.bdist)
 				local p = note.vpower
 				while p >= 0 do
 					val = val * note.amp / 32768
@@ -208,9 +213,9 @@ programs = {
 				end
 				val = math.min(math.floor(distort(val, note.fdist) / 128), 127)
 
-				note.mpitch = math.floor(note.mpitch * note.mpitchdecay) / 65536
-				note.bpitch = math.floor(note.bpitch * note.bpitchdecay) / 65536
-				note.mod    = math.floor(note.mod    * note.moddecay   ) / 65536
+				note.mpitch = bit.band(math.floor(note.mpitch * note.mpitchdecay / 65536), 0xFFFFFFFF)
+				note.bpitch = bit.band(math.floor(note.bpitch * note.bpitchdecay / 65536), 0xFFFFFFFF)
+				note.mod    = bit.band(math.floor(note.mod    * note.moddecay    / 65536), 0xFFFFFFFF)
 
 				if note.attacking then
 					note.amp = note.amp + note.attack
