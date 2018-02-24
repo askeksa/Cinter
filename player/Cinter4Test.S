@@ -11,7 +11,7 @@ TOPAZ	=	0
 SECTIONHACK	=	0
 
 	include	Cinter:DemoStartup.S
-	include	Cinter:Cinter3.S
+	include	Cinter:Cinter4.S
 
 _Exit:
 	moveq.l	#0,d0
@@ -61,7 +61,7 @@ _Interrupt:
 	rts
 
 MusicData:
-	incbin	Cinter:automatic.cinter3
+	incbin	Cinter:automatic.cinter4
 
 InstrumentData:
 	incbin	Cinter:automatic.raw
