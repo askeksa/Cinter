@@ -80,6 +80,76 @@ function render(inputs, outputs, start, stop)
 	end
 end
 
+
+function p(v)
+	return math.floor(v * 100 + 0.5)
+end
+
+function envfun(value)
+	local v = p(value)
+	return math.floor(10000 / (1 + v * v))
+end
+
+function envdisplay(value)
+	local f = envfun(value)
+	if f == 0 then
+		return "infinite", ""
+	end
+	return string.format("%d", math.ceil(32768 / f)), "samples"
+end
+
+function pitchfun(value)
+	local v = p(value)
+	if v == 0 then
+		return 0
+	end
+	if v < 5 then
+		return bit.lshift(8, v)
+	end
+	return math.floor(0.5 + 256 * math.pow(2, (v - 5) / 12))
+end
+
+function pitchdisplay(value)
+	local v = p(value)
+	if v == 0 then
+		return "none", ""
+	end
+	if v < 5 then
+		return string.format("%d oct", v - 5), ""
+	end
+	local t = v - 5
+	if t % 12 == 0 then
+		return string.format("%d oct", t / 12), ""
+	end
+	return string.format("%d oct %d", math.floor(t / 12), t % 12), "st"
+end
+
+function moddisplay(value)
+	return string.format("%d", p(value)), ""
+end
+
+function decayfun(value)
+	local v = p(value) / 50 - 1
+	return math.floor(0.5 + math.exp(0.0008 * v + 0.1 * math.pow(v, 7)) * 65536)
+end
+
+function decaydisplay(value)
+	local f = decayfun(value)
+	return string.format("%.5f", f / 65536), ""
+end
+
+function distfun(value)
+	return math.floor(0.5 + value * 10)
+end
+
+function distdisplay(value)
+	return string.format("%d", distfun(value)), ""
+end
+
+function powerdisplay(value)
+	return string.format("%d", distfun(value) + 1), ""
+end
+
 programs = {
 	cinter4 = {
 		paramnames = {
@@ -96,39 +166,37 @@ programs = {
 			"vpower",
 			"fdist"
 		},
+		paramdefaults = {
+			0.05, 0.40, 0.53, 0.50, 0.65, 0.50, 0.20, 0.40, 0.0, 0.0, 0.1, 0.2
+		},
+		paramdisplay = {
+			envdisplay,
+			envdisplay,
+			pitchdisplay,
+			decaydisplay,
+			pitchdisplay,
+			decaydisplay,
+			moddisplay,
+			decaydisplay,
+			distdisplay,
+			distdisplay,
+			powerdisplay,
+			distdisplay,
+		},
 		new = function(channel, tone, velocity)
-			function p(v)
-				return math.floor(v * 100 + 0.5)
-			end
-			function ps(v, width)
-				if width == 1 then
-					local p = math.floor(v * 10 + 0.5)
-					if p == 10 then return "X" end
-					return string.format("%01d", p)
-				else
-					local p = math.floor(v * 100 + 0.5)
-					if p == 100 then return "XX" end
-					return string.format("%02d", p)
-				end
-			end
-			function decaycurve(value)
-				local v = p(value) / 50 - 1
-				return math.floor(0.5 + math.exp(0.0008 * v + 0.1 * math.pow(v, 7)) * 65536)
-			end
-
 			note = {
-				attack      = math.floor(10000 / (1 + p(params.attack) * p(params.attack))),
-				decay       = math.floor(10000 / (1 + p(params.decay)  * p(params.decay) )),
-				mpitch      = p(params.mpitch) * 512 * 65536,
-				bpitch      = p(params.bpitch) * 512 * 65536,
-				mod         = p(params.mod)          * 65536,
-				mpitchdecay = decaycurve(params.mpitchdecay),
-				bpitchdecay = decaycurve(params.bpitchdecay),
-				moddecay    = decaycurve(params.moddecay),
-				mdist       = math.floor(0.5 + params.mdist * 10),
-				bdist       = math.floor(0.5 + params.bdist * 10),
-				vpower      = math.floor(0.5 + params.vpower * 10),
-				fdist       = math.floor(0.5 + params.fdist * 10),
+				attack      = envfun(params.attack),
+				decay       = envfun(params.decay),
+				mpitch      = pitchfun(params.mpitch) * 65536,
+				bpitch      = pitchfun(params.bpitch) * 65536,
+				mod         = p(params.mod)           * 65536,
+				mpitchdecay = decayfun(params.mpitchdecay),
+				bpitchdecay = decayfun(params.bpitchdecay),
+				moddecay    = decayfun(params.moddecay),
+				mdist       = distfun(params.mdist),
+				bdist       = distfun(params.bdist),
+				vpower      = distfun(params.vpower),
+				fdist       = distfun(params.fdist),
 
 				amp            = 0,
 				attacking      = true,
@@ -163,6 +231,17 @@ programs = {
 					local filename
 					if note.tone == 52 then
 						-- Save with Protracker-compatible name
+						function ps(v, width)
+							if width == 1 then
+								local p = math.floor(v * 10 + 0.5)
+								if p == 10 then return "X" end
+								return string.format("%01d", p)
+							else
+								local p = math.floor(v * 100 + 0.5)
+								if p == 100 then return "XX" end
+								return string.format("%02d", p)
+							end
+						end
 						filename = string.format("1%s%s%s%s%s%s%s%s%s%s%s%s.raw",
 							ps(params.attack, 2), ps(params.decay, 2),
 							ps(params.mpitch, 2), ps(params.mpitchdecay, 2),
