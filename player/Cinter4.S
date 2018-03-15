@@ -1,6 +1,10 @@
 ;              T         T               T
 
 
+	ifnd	CINTER_MANUAL_DMA
+CINTER_MANUAL_DMA set 0
+	endc
+
 CINTER_DEGREES	=	16384
 
 	rsreset
@@ -12,8 +16,10 @@ c_MusicPointer	rs.l	1
 c_MusicEnd	rs.l	1
 c_MusicLoop	rs.l	1
 c_MusicState	rs.l	4*3
+	ifeq	CINTER_MANUAL_DMA
 c_dma	rs.w	1
 c_waitline	rs.w	1
+	endc
 c_Instruments	rs.l	32*2
 c_Sinus	rs.w	CINTER_DEGREES
 c_SIZE	rs.w	0
@@ -278,18 +284,20 @@ CinterPlay1:
 .notend:
 
 	; Turn off DMA for triggered channels
-	moveq.l	#0,d4
+	moveq.l	#0,d0
 	rept	4
-	move.w	(a1),d0
+	move.w	(a1),d2
 	add.w	d1,a1
-	add.w	d0,d0
-	addx.w	d4,d4
+	add.w	d2,d2
+	addx.w	d0,d0
 	endr
-	move.w	d4,$096(a3)
+	move.w	d0,$096(a3)
 
+	ifeq	CINTER_MANUAL_DMA
 	; Save line and dma
-	move.w	$006(a3),d5
-	movem.w	d4/d5,c_dma-c_MusicLoop(a0)
+	move.w	$006(a3),d1
+	movem.w	d0/d1,c_dma-c_MusicLoop(a0)
+	endc
 	rts
 
 CinterPlay2:
@@ -389,15 +397,17 @@ CinterPlay2:
 	move.l	a4,-(a3)	; Pointer
 	dbf	d7,.channelloop
 
+	ifeq	CINTER_MANUAL_DMA
 	; Wait for old DMA to stop, then start new DMA
-	move.w	(a0)+,d4
+	move.w	(a0)+,d0
 	beq.b	.nodma
-	or.w	#$8000,d4
-	move.w	(a0)+,d5
-	add.w	#$0780,d5
+	or.w	#$8000,d0
+	move.w	(a0)+,d1
+	add.w	#$0780,d1
 	lea.l	$dff000,a3
-.dmawait:	cmp.w	$006(a3),d5
+.dmawait:	cmp.w	$006(a3),d1
 	bgt.b	.dmawait
-	move.w	d4,$096(a3)
+	move.w	d0,$096(a3)
 .nodma:
+	endc
 	rts

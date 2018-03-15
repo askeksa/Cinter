@@ -4,11 +4,13 @@ COMPATIBILITY	=	1
 FASTMEM	=	0
 RMBPAUSE	=	0
 FPUINT	=	0
-COPPER	=	0
+COPPER	=	1
 BLITTER	=	0
 SPRITE	=	0
 TOPAZ	=	0
 SECTIONHACK	=	0
+
+CINTER_MANUAL_DMA =	0
 
 	include	Cinter:DemoStartup.S
 	include	Cinter:Cinter4.S
@@ -40,6 +42,14 @@ _Precalc:
 	rts
 
 _Main:
+	if	CINTER_MANUAL_DMA
+	move.l	ChipPtr(pc),a4
+	add.l	#Copper-Chip,a4
+	move.l	a4,$dff080
+	move.l	#$1001fffe,(a4)+
+	move.l	#$00960000,(a4)+
+	move.l	#$fffffffe,(a4)+
+	endc
 
 MainLoop:
 	bra.w	MainLoop
@@ -50,6 +60,14 @@ _Interrupt:
 	add.l	#CinterSpace-MusicData,a6
 	; A6 = Cinter working memory
 	bsr.w	CinterPlay1
+
+	; Manual writing of DMA enable
+	if	CINTER_MANUAL_DMA
+	move.l	ChipPtr(pc),a4
+	add.l	#CopperDMA-Chip,a4
+	or.w	#$8000,d0
+	move.w	d0,(a4)
+	endc
 
 	; Put your other interrupt code here
 
@@ -74,6 +92,12 @@ CinterSpace:
 
 	section	inst,bss_c
 Chip:
+
+	if	CINTER_MANUAL_DMA
+Copper:
+	ds.l	3
+CopperDMA	=	Copper+6
+	endc
 
 InstrumentSpace:
 	ds.b	200000
