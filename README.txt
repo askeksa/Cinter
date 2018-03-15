@@ -15,24 +15,25 @@ You will need:
 
 
 To use the synth, you need to follow these steps:
-1. Download MetaSynth.dll from https://github.com/askeksa/MetaSynth/releases
+1. Download MetaSynth.dll from https://github.com/askeksa/MetaSynth/releases.
    This is a generic VST which delegates the sound generation to a Lua program.
+   Be sure to get version 2.1 or higher.
 2. Install the VST in your favorite VST host. For example, in Renoise, you need
    to place it in a directory mentioned under VST Plugins in the Plug/Misc
    settings. The VST host must provide a GUI for generic VST parameters which
    can adjust parameter values at 0.01 precision.
 3. Select the VST for an instrument. In the file selector that pops up, select
-   the Cinter3.lua file.
+   the Cinter4.lua file.
 4. Adjust parameters to your liking. Test the sound using the notes C-1 to B-3,
    which correspond to the same notes in Protracker on the Amiga.
 5. When satisfied with an instrument, play an E-4 note. This will save a raw
-   8-bit sample into the directory where Cinter3.lua is located. The name of
+   8-bit sample into the directory where Cinter4.lua is located. The name of
    the file contains an encoding of all the parameters.
 6. Use these samples to make music in Protracker (or another tracker capable of
    saving in Protracker format).
 7. Run the CinterConvert.py script on the Protracker module. It will output
    binary files to be included in your intro.
-8. Include the Cinter3.S source file and the binary output files from the
+8. Include the Cinter4.S source file and the binary output files from the
    conversion script in your intro and use them as prescribed.
 9. Profit. :)
 
@@ -45,14 +46,18 @@ parameters:
 attack/decay:
   The durations for which the volume envelope of the sound rises and falls.
 mpitch/bpitch (Modulation Pitch / Base Pitch):
-  The pitch of the oscillators. To get an in-tune sound, set each of these to
-  one of 0.01, 0.02, 0.04, 0.08, 0.16, 0.32 or 0.64.
+  The pitch of the oscillators. Pitches can be adjusted in semitone increments.
+  To get an in-tune sound, use a transpose of a whole number of octaves.
 mpitchdecay/bpitchdecay (Modulation Pitch Decay / Base Pitch Decay):
-  Falloff of the oscillator pitches.
+  Time development of the oscillator pitches. The pitches can either have
+  exponential falloff (values below the middle) or exponential growth (values
+  above the middle).
 mod (Modulation):
   How strongly the modulation oscillator modulates the base oscillator.
 moddecay (Modulation Decay):
-  Falloff of the modulation strength.
+  Time development of the modulation strength. The modulation strength can
+  either have exponential falloff (values below the middle) or exponential
+  growth (values above the middle).
 mdist/bdist (Modulation Distortion / Base Distortion):
   Distort the oscillator waveforms from a sine towards a square.
 vpower (Volume envelope Power):
@@ -60,21 +65,23 @@ vpower (Volume envelope Power):
 fdist (Final Distortion):
   Amplifies and distorts the sound after application of the volume envelope.
 
-At least one of attack and decay and at least one of the pitches must be raised
-above zero to get any sound.
-
 You can easily convert back from a saved sample to the original parameters:
+- The first character is a version indicator. If this is a number, the sample
+  was produced by Cinter 4, otherwise by Cinter 3.
 - For the first 8 parameters, divide two digits by 100. XX means 1.
 - For the last 4 parameters, divide one digit by 10. X means 1.
+Enter this result as the underlying parameter value (not the one shown).
 
 
 PROTRACKER GUIDELINES
 
 You can use a combination of Cinter and non-Cinter ("raw") instruments in your
 module. The Cinter instruments are recognized by their special sample names.
-You may change the initial 's' in the sample names to a different character,
-but the sample names must be otherwise intact, in order to communicate the
-instrument parameters to the conversion script.
+These sample names must be left intact, in order to communicate the instrument
+parameters to the conversion script.
+
+Samples produced by Cinter 3 and Cinter 4 can be freely used together in the
+same module, as long as the Cinter 4 converter and player are used.
 
 You can write whatever you like in the names of raw and unused instruments,
 so the traditional module info can be placed here.
@@ -145,14 +152,15 @@ fully compatible with other versions.
 
 THE REPLAYER
 
-Player source code is provided in the Cinter3.S file. There are three
+Player source code is provided in the Cinter4.S file. There are three
 important routines to know about:
 
 CinterInit:
   Computes the samples and sets up the player state.
   A 7MHz 68000 can typically compute 2-6k of sample data per second,
-  depending on the values of the distortion and vpower parameters
-  (higher parameter values result in slower computation).
+  depending on the values of the parameters. Non-neutral Pitch Decay
+  and Modulation Decay values take longer time, and higher distortion
+  and vpower values take longer time.
 
 CinterPlay1:
   Call as the very first thing in your vblank interrupt.
@@ -164,6 +172,15 @@ CinterPlay2:
   Modifies volumes and periods according to music.
   Waits until enough time has passed since previously playing samples
   were stopped (7.5 rasterlines), then triggers the new samples.
+
+Alternatively, you can take over responsibility of writing the trigger mask
+to the DMA enable register:
+ - Set CINTER_MANUAL_DMA to 1.
+ - Pick up the trigger mask, returned in D0 from CinterPlay1.
+ - OR the mask with $8000 to produce a DMA enable mask.
+ - Write this mask to $DFF096 at least 7.5 scanlines after CinterPlay1 returns.
+ - Make sure CinterPlay2 has completed execution before you write the mask.
+The Cinter4Test.S example code shows how to do this using the copper.
 
 At the end of the music, the player behaves just as when playing the module
 in Protracker: If the module contains an F00 command (stop), the music will
@@ -191,6 +208,13 @@ VERSION HISTORY
             Fixed trimming of trailing silence.
             Fixed printing of max note for instrument.
 
+2018-03-15: Version bump to Cinter 4, due to parameter changes.
+            Pitch Decay and Modulation Decay can grow upwards.
+            Pitch values are adjusted in semitone increments.
+            Parameters have sensible default values.
+            Parameter values have descriptive display text.
+            Player option to handle the DMA write manually.
+            More accurate estimation of precalc time.
 
 ACKNOWLEDGEMENTS
 
