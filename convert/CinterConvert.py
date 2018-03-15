@@ -517,7 +517,9 @@ for i in range(1, last_nonempty_inst + 1):
 		dist = (p[8] << 12) | (p[9] << 8) | (p[10] << 4) | p[11]
 
 		inst_data[index] = struct.pack(">11H", length, replen, mpitch, mod, bpitch, attack, dist, decay, mpitchdecay, moddecay, bpitchdecay)
-		total_inst_time += (20 + p[8] + p[9] + p[10] + p[11]) * length * 0.000017
+		sample_time = 42 + 2 * (p[8] + p[9] + p[11]) + 3 * p[10]
+		sample_time += sum(7 for d in [mpitchdecay, bpitchdecay, moddecay] if d != 0)
+		total_inst_time += sample_time * length * 0.0000075
 		inst_type = "C"
 		version_string = str(inst.version)
 	else:
@@ -563,7 +565,7 @@ print "Uncompressed music data size: %7d bytes" % out_size
 if raw_inst_size > 0:
 	print "Total raw instrument size:    %7d bytes" % (raw_inst_size * 2)
 print "Total instrument memory:      %7d bytes" % (total_inst_size * 2)
-print "Appr. precalc time on 68000:  %7d seconds" % int(total_inst_time + 0.5)
+print "Approx. precalc time on 68000:%7d seconds" % int(total_inst_time + 0.5)
 print "Music duration:               %7d vblanks (%d:%02d)" % (musiclength, (musiclength + 25) / 3000, (musiclength + 25) % 3000 / 50)
 print "Restart position:             %7d vblanks (%d:%02d)" % (restart, (restart + 25) / 3000, (restart + 25) % 3000 / 50)
 print "Number of different note IDs:   %5d" % note_id
