@@ -216,6 +216,7 @@ VERSION HISTORY
             Player option to handle the DMA write manually.
             More accurate estimation of precalc time.
 
+
 ACKNOWLEDGEMENTS
 
 Cinter is developed by Aske Simon Christensen, aka Blueberry.
