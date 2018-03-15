@@ -448,13 +448,13 @@ total_inst_size = 0
 total_inst_time = 1.0
 last_nonempty_inst = max(i for i in range(1, 32) if module.instruments[i].name.strip() != "" or i in inst_list)
 print
-print "Inst Name                   Length Repeat Idx Count  Low High 9xx  IDs  Error?"
+print "Inst V Name                   Length Repeat Idx Count  Low High 9xx IDs Error?"
 for i in range(1, last_nonempty_inst + 1):
 	inst = module.instruments[i]
 
 	# Unused instrument?
 	if i not in inst_list:
-		print "%02d   %-22s" % (i, inst.name)
+		print "%02d     %-22s" % (i, inst.name)
 		continue
 
 	# General statistics
@@ -482,6 +482,17 @@ for i in range(1, last_nonempty_inst + 1):
 	total_inst_size += length
 	inst.length = length
 
+	# Pitch conversion
+	def pitchconv(v):
+		if inst.version >= 4:
+			if v == 0:
+				return 0
+			if v < 5:
+				return v << 8
+			return math.floor(0.5 + 256 * math.pow(2, (v - 5) / 12))
+		else:
+			return v * 512
+
 	# Decay conversion
 	def decaycurve(v):
 		if inst.version >= 4:
@@ -495,9 +506,9 @@ for i in range(1, last_nonempty_inst + 1):
 		# Parameters on word form for synth code
 		attack      = 65536-int(math.floor(10000.0 / (1 + p[0] * p[0])))
 		decay       = int(math.floor(10000.0 / (1 + p[1] * p[1])))
-		mpitch      = p[2] * 512
+		mpitch      = pitchconv(p[2])
 		mpitchdecay = decaycurve(p[3])
-		bpitch      = p[4] * 512
+		bpitch      = pitchconv(p[4])
 		bpitchdecay = decaycurve(p[5])
 		mod         = p[6]
 		moddecay    = decaycurve(p[7])
@@ -508,14 +519,16 @@ for i in range(1, last_nonempty_inst + 1):
 		inst_data[index] = struct.pack(">11H", length, replen, mpitch, mod, bpitch, attack, dist, decay, mpitchdecay, moddecay, bpitchdecay)
 		total_inst_time += (20 + p[8] + p[9] + p[10] + p[11]) * length * 0.000017
 		inst_type = "C"
+		version_string = str(inst.version)
 	else:
 		inst_data[index] = struct.pack(">2H", length, replen)
 		raw_instruments.append(i)
 		raw_inst_size += length
 		inst_type = "R"
+		version_string = " "
 
-	print "%02d %c %-22s %6d %6s  %2d %5d  %3s  %3s %3d %4d  %s" % (
-		i, inst_type, inst.name, length * 2, "" if not replen else replen * 2, index, inst_counts[i],
+	print "%02d %c %1s %-22s %6d %6s  %2d %5d  %3s  %3s %3d %3d %s" % (
+		i, inst_type, version_string, inst.name, length * 2, "" if not replen else replen * 2, index, inst_counts[i],
 		notename(min_note), notename(max_note), len(offsets) - 1, n_note_ids, msg
 	)
 
