@@ -5,8 +5,10 @@ extern crate vst;
 mod engine;
 
 use std::cell::RefCell;
-use std::rc::Rc;
 use std::collections::VecDeque;
+use std::fs::{canonicalize, File};
+use std::io::Write;
+use std::rc::Rc;
 use std::sync::RwLock;
 
 use vst::api::{Events, Supported};
@@ -15,8 +17,7 @@ use vst::event::{Event, MidiEvent};
 use vst::plugin::{CanDo, Category, HostCallback, Info, Plugin};
 
 use crate::engine::PARAMETER_COUNT;
-use crate::engine::CinterEngine;
-use crate::engine::CinterInstrument;
+use crate::engine::{CinterEngine, CinterInstrument};
 
 #[allow(dead_code)]
 pub enum MidiCommand {
@@ -239,6 +240,8 @@ impl Plugin for CinterPlugin {
 
 impl CinterPlugin {
 	fn handle_event(&mut self, event: TimedMidiCommand) {
+		let mut write_filename = None;
+
 		match event.command {
 			MidiCommand::NoteOn { key, velocity, .. } => {
 				let mut params = self.params.write().unwrap();
@@ -247,6 +250,10 @@ impl CinterPlugin {
 					params.changed = false;
 				}
 				self.notes.push(Note::new(self.instrument.clone(), key, velocity, self.sample_rate));
+
+				if key == 52 {
+					write_filename = Some(CinterEngine::get_sample_filename(&params.values));
+				}
 			},
 			MidiCommand::NoteOff { key, velocity, .. } => {
 				for note in &mut self.notes {
@@ -267,6 +274,29 @@ impl CinterPlugin {
 				self.notes.clear();
 			},
 			MidiCommand::Unknown => {}
+		}
+
+		if let Some(filename) = write_filename {
+			let full_path = match canonicalize(&filename) {
+				Ok(path) => path.to_string_lossy().to_string(),
+				Err(_) => filename.clone()
+			};
+			if let Ok(mut file) = File::create(filename) {
+				let mut instrument = self.instrument.borrow_mut();
+				let data: Vec<u8> = (0..65534).map(|i| {
+					instrument.get_sample(i) as u8
+				}).collect();
+				let mut len = data.len();
+				while len > 2 && data[len - 2 .. len] == [0, 0] {
+					len -= 2;
+				}
+				match file.write_all(&data[0 .. len]) {
+					Ok(_) => println!("Cinter: Wrote sample to file: {}", full_path),
+					Err(_) => println!("Cinter: Could not write to file: {}", full_path),
+				}
+			} else {
+				println!("Cinter: Could not open file: {}", full_path);
+			}
 		}
 	}
 

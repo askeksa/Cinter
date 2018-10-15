@@ -85,6 +85,31 @@ impl CinterEngine {
 		};
 		(text, label.to_string())
 	}
+
+	pub fn get_sample_filename(params: &[f32; PARAMETER_COUNT]) -> String {
+		let mut name = "1".to_string();
+		for i in 0..PARAMETER_COUNT {
+			let repr = if i < 8 {
+				// Two digits
+				let v = p100(params[i]);
+				if v == 100 {
+					"XX".to_string()
+				} else {
+					format!("{:02}", v)
+				}
+			} else {
+				// One digit
+				let v = p10(params[i]);
+				if v == 10 {
+					"X".to_string()
+				} else {
+					format!("{:01}", v)
+				}
+			};
+			name += &repr;
+		}
+		name + ".raw"
+	}
 }
 
 impl CinterInstrument {
