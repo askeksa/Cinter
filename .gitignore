@@ -1,2 +1,4 @@
 *.raw
 test
+cinter/Cargo.lock
+cinter/target

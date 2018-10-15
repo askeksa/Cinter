@@ -1,0 +1,12 @@
+[package]
+name = "Cinter"
+version = "4.0.0"
+authors = ["Aske Simon Christensen <askesc@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+vst = { git = "https://github.com/rust-dsp/rust-vst" }
+
+[lib]
+name = "cinter"
+crate-type = ["cdylib"]
