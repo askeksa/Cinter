@@ -70,6 +70,13 @@ impl Note {
 		}
 	}
 
+	fn release_amplitude(&self) -> f32 {
+		match self.release_time {
+			Some(release_time) => (1.0 - (self.time - release_time) as f32 * 0.001).max(0.0),
+			None => 1.0
+		}
+	}
+
 	fn produce_sample(&mut self) -> f32 {
 		let phase = self.time as f32 * self.freq;
 		let i = phase.floor() as usize;
@@ -84,9 +91,7 @@ impl Note {
 		let d2 = instrument.get_sample(i + 2) as f32;
 		let d3 = instrument.get_sample(i + 3) as f32;
 		let mut v = a0*d0 + a1*d1 + a2*d2 + a3*d3;
-		if let Some(release_time) = self.release_time {
-			v *= 1.0 - (self.time - release_time) as f32 * 0.1;
-		}
+		v *= self.release_amplitude();
 		self.time += 1;
 		v / 254.0
 	}
@@ -100,10 +105,7 @@ impl Note {
 	}
 
 	fn is_alive(&self) -> bool {
-		match self.release_time {
-			Some(time) => self.time - time > 10,
-			None => true
-		}
+		self.release_amplitude() > 0.0
 	}
 }
 
