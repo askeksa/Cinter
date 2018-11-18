@@ -16,8 +16,8 @@ use vst::buffer::AudioBuffer;
 use vst::event::{Event, MidiEvent};
 use vst::plugin::{CanDo, Category, HostCallback, Info, Plugin};
 
-use crate::engine::PARAMETER_COUNT;
-use crate::engine::{CinterEngine, CinterInstrument};
+use engine::PARAMETER_COUNT;
+use engine::{CinterEngine, CinterInstrument};
 
 #[allow(dead_code)]
 pub enum MidiCommand {
