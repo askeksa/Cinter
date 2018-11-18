@@ -15,27 +15,24 @@ You will need:
 
 
 To use the synth, you need to follow these steps:
-1. Download MetaSynth.dll from https://github.com/askeksa/MetaSynth/releases.
-   This is a generic VST which delegates the sound generation to a Lua program.
-   Be sure to get version 2.1 or higher.
-2. Install the VST in your favorite VST host. For example, in Renoise, you need
-   to place it in a directory mentioned under VST Plugins in the Plug/Misc
-   settings. The VST host must provide a GUI for generic VST parameters which
-   can adjust parameter values at 0.01 precision.
-3. Select the VST for an instrument. In the file selector that pops up, select
-   the Cinter4.lua file.
-4. Adjust parameters to your liking. Test the sound using the notes C-1 to B-3,
-   which correspond to the same notes in Protracker on the Amiga.
-5. When satisfied with an instrument, play an E-4 note. This will save a raw
+1. Locate the VST plugin for your OS in the vst directory and install it in
+   your favorite VST host. For example, in Renoise, you need to place it in a
+   directory mentioned under VST Plugins in the Plug/Misc settings.
+   The VST host must provide a GUI for generic VST parameters which can adjust
+   parameter values at 0.01 precision.
+2. Select the VST for an instrument and adjust parameters to your liking.
+   Test the sound using the notes C-1 to B-3, which correspond to the same
+   notes in Protracker on the Amiga.
+3. When satisfied with an instrument, play an E-4 note. This will save a raw
    8-bit sample into the directory where Cinter4.lua is located. The name of
    the file contains an encoding of all the parameters.
-6. Use these samples to make music in Protracker (or another tracker capable of
+4. Use these samples to make music in Protracker (or another tracker capable of
    saving in Protracker format).
-7. Run the CinterConvert.py script on the Protracker module. It will output
+5. Run the CinterConvert.py script on the Protracker module. It will output
    binary files to be included in your intro.
-8. Include the Cinter4.S source file and the binary output files from the
-   conversion script in your intro and use them as prescribed.
-9. Profit. :)
+6. Include the Cinter4.S source file and the binary output files from the
+   conversion script in your intro and use them as prescribed. See the
+   Cinter4Test.S file for a usage example.
 
 
 USING THE VST
@@ -215,6 +212,9 @@ VERSION HISTORY
             Parameter values have descriptive display text.
             Player option to handle the DMA write manually.
             More accurate estimation of precalc time.
+
+2018-11-18: Re-implemented the synth as a stand-alone VST in Rust.
+            VST builds available for Windows, Mac and Linux.
 
 
 ACKNOWLEDGEMENTS
