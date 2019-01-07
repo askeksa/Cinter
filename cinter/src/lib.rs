@@ -1,7 +1,4 @@
 
-#[macro_use]
-extern crate vst;
-
 mod engine;
 
 use std::cell::RefCell;
@@ -15,9 +12,10 @@ use vst::api::{Events, Supported};
 use vst::buffer::AudioBuffer;
 use vst::event::{Event, MidiEvent};
 use vst::plugin::{CanDo, Category, HostCallback, Info, Plugin};
+use vst::plugin_main;
 
-use engine::PARAMETER_COUNT;
-use engine::{CinterEngine, CinterInstrument};
+use crate::engine::PARAMETER_COUNT;
+use crate::engine::{CinterEngine, CinterInstrument};
 
 #[allow(dead_code)]
 pub enum MidiCommand {
