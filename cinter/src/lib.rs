@@ -3,8 +3,9 @@ mod engine;
 
 use std::cell::RefCell;
 use std::collections::VecDeque;
-use std::fs::{canonicalize, File};
+use std::fs::File;
 use std::io::Write;
+use std::path::Path;
 use std::rc::Rc;
 use std::sync::RwLock;
 
@@ -13,6 +14,8 @@ use vst::buffer::AudioBuffer;
 use vst::event::{Event, MidiEvent};
 use vst::plugin::{CanDo, Category, HostCallback, Info, Plugin};
 use vst::plugin_main;
+
+use nfd::{open_pick_folder, Response};
 
 use crate::engine::PARAMETER_COUNT;
 use crate::engine::{CinterEngine, CinterInstrument};
@@ -277,25 +280,24 @@ impl CinterPlugin {
 		}
 
 		if let Some(filename) = write_filename {
-			let full_path = match canonicalize(&filename) {
-				Ok(path) => path.to_string_lossy().to_string(),
-				Err(_) => filename.clone()
-			};
-			if let Ok(mut file) = File::create(filename) {
-				let mut instrument = self.instrument.borrow_mut();
-				let data: Vec<u8> = (0..65534).map(|i| {
-					instrument.get_sample(i) as u8
-				}).collect();
-				let mut len = data.len();
-				while len > 2 && data[len - 2 .. len] == [0, 0] {
-					len -= 2;
+			if let Ok(Response::Okay(path)) = open_pick_folder(None) {
+				let full_path = Path::new(&path).join(filename);
+				if let Ok(mut file) = File::create(&full_path) {
+					let mut instrument = self.instrument.borrow_mut();
+					let data: Vec<u8> = (0..65534).map(|i| {
+						instrument.get_sample(i) as u8
+					}).collect();
+					let mut len = data.len();
+					while len > 2 && data[len - 2 .. len] == [0, 0] {
+						len -= 2;
+					}
+					match file.write_all(&data[0 .. len]) {
+						Ok(_) => println!("Cinter: Wrote sample to file: {:?}", full_path),
+						Err(_) => println!("Cinter: Could not write to file: {:?}", full_path),
+					}
+				} else {
+					println!("Cinter: Could not open file: {:?}", full_path);
 				}
-				match file.write_all(&data[0 .. len]) {
-					Ok(_) => println!("Cinter: Wrote sample to file: {}", full_path),
-					Err(_) => println!("Cinter: Could not write to file: {}", full_path),
-				}
-			} else {
-				println!("Cinter: Could not open file: {}", full_path);
 			}
 		}
 	}
