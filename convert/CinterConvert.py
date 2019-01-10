@@ -488,8 +488,8 @@ for i in range(1, last_nonempty_inst + 1):
 			if v == 0:
 				return 0
 			if v < 5:
-				return v << 8
-			return math.floor(0.5 + 256 * math.pow(2, (v - 5) / 12))
+				return 8 << v
+			return math.floor(0.5 + 256 * math.pow(2, (v - 5) / 12.0))
 		else:
 			return v * 512
 
