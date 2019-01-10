@@ -23,8 +23,9 @@ To use the synth, you need to follow these steps:
 2. Select the VST for an instrument and adjust parameters to your liking.
    Test the sound using the notes C-1 to B-3, which correspond to the same
    notes in Protracker on the Amiga.
-3. When satisfied with an instrument, play an E-4 note. This will save a raw
-   8-bit sample into the directory where Cinter4.lua is located. The name of
+3. When satisfied with an instrument, play an E-4 note. This will open a
+   directory selection dialog, where you can choose where to save the sample.
+   A raw 8-bit sample will be saved into the chosen directory. The name of
    the file contains an encoding of all the parameters.
 4. Use these samples to make music in Protracker (or another tracker capable of
    saving in Protracker format).
@@ -215,6 +216,9 @@ VERSION HISTORY
 
 2018-11-18: Re-implemented the synth as a stand-alone VST in Rust.
             VST builds available for Windows, Mac and Linux.
+
+2019-01-10: Fixed broken pitch conversion for Cinter 4 instruments.
+            Open a directory dialog when saving a sample.
 
 
 ACKNOWLEDGEMENTS
