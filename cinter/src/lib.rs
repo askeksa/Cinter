@@ -160,12 +160,13 @@ impl Plugin for CinterPlugin {
 
 	fn get_info(&self) -> Info {
 		Info {
-			presets: 0,
+			presets: 1,
 			parameters: PARAMETER_COUNT as i32,
 			inputs: 0,
 			outputs: 2,
 			category: Category::Synth,
 			f64_precision: false,
+			preset_chunks: true,
 
 			name: "Cinter".to_string(),
 			vendor: "Loonies".to_string(),
@@ -238,6 +239,37 @@ impl Plugin for CinterPlugin {
 		let mut params = self.params.write().unwrap();
 		params.values[index as usize] = value;
 		params.changed = true;
+	}
+
+	fn get_preset_name(&self, _preset: i32) -> String {
+		"Boing".to_string()
+	}
+
+	fn get_preset_data(&mut self) -> Vec<u8> {
+		let params = self.params.read().unwrap();
+		let mut data = vec![];
+		for p in &params.values {
+			data.extend_from_slice(&p.to_bits().to_le_bytes());
+		}
+		data
+	}
+
+	fn get_bank_data(&mut self) -> Vec<u8> {
+		self.get_preset_data()
+	}
+
+	fn load_preset_data(&mut self, data: &[u8]) {
+		let mut params = self.params.write().unwrap();
+		for (i, chunk) in data.chunks_exact(4).enumerate() {
+			let mut bytes = [0u8; 4];
+			bytes.copy_from_slice(chunk);
+			params.values[i] = f32::from_bits(u32::from_le_bytes(bytes));
+		}
+		params.changed = true;
+	}
+
+	fn load_bank_data(&mut self, data: &[u8]) {
+		self.load_preset_data(data);
 	}
 }
 
