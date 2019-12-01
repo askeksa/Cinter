@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 vst = "0.1.0"
-nfd = "0.0.4"
+nfd = { git = "https://github.com/saurvs/nfd-rs.git" }
 
 [lib]
 name = "cinter"
