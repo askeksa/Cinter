@@ -9,7 +9,7 @@ CINTER_DEGREES	=	16384
 
 	rsreset
 c_SampleState	rs.l	3
-c_PeriodTable	rs.w	36
+c_PeriodTable	rs.w	36+1
 c_TrackSize	rs.w	1
 c_InstPointer	rs.l	1
 c_MusicPointer	rs.l	1
@@ -234,7 +234,7 @@ CinterComputePeriods:
 	move.w	#$e2b3,d0
 	move.l	#$0fc0fd20,d2
 	moveq.l	#0,d6
-	moveq.l	#3*12-1,d7
+	moveq.l	#36,d7	; Write extra dummy for alignment
 .loop1:	mulu.w	#61865,d0
 	swap.w	d0
 	move.w	d0,d1
