@@ -7,12 +7,12 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use std::rc::Rc;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 
 use vst::api::{Events, Supported};
 use vst::buffer::AudioBuffer;
 use vst::event::{Event, MidiEvent};
-use vst::plugin::{CanDo, Category, HostCallback, Info, Plugin};
+use vst::plugin::{CanDo, Category, HostCallback, Info, Plugin, PluginParameters};
 use vst::plugin_main;
 
 use nfd::{open_pick_folder, Response};
@@ -112,7 +112,7 @@ impl Note {
 
 
 pub struct CinterPlugin {
-	params: RwLock<Parameters>,
+	param_object: Arc<CinterParameterObject>,
 
 	sample_rate: f32,
 	time: usize,
@@ -121,6 +121,10 @@ pub struct CinterPlugin {
 
 	engine: Rc<CinterEngine>,
 	instrument: Rc<RefCell<CinterInstrument>>,
+}
+
+pub struct CinterParameterObject {
+	params: RwLock<Parameters>,
 }
 
 struct Parameters {
@@ -140,7 +144,9 @@ impl Default for CinterPlugin {
 		let instrument = Rc::new(RefCell::new(CinterInstrument::new(engine.clone(), &params.values)));
 
 		CinterPlugin {
-			params: RwLock::new(params),
+			param_object: Arc::new(CinterParameterObject {
+				params: RwLock::new(params),
+			}),
 
 			sample_rate: 44100.0,
 			time: 0,
@@ -215,7 +221,9 @@ impl Plugin for CinterPlugin {
 	fn set_sample_rate(&mut self, rate: f32) {
 		self.sample_rate = rate;
 	}
+}
 
+impl PluginParameters for CinterParameterObject {
 	fn get_parameter_name(&self, index: i32) -> String {
 		CinterEngine::get_parameter_name(index)
 	}
@@ -235,7 +243,7 @@ impl Plugin for CinterPlugin {
 		params.values[index as usize]
 	}
 
-	fn set_parameter(&mut self, index: i32, value: f32) {
+	fn set_parameter(&self, index: i32, value: f32) {
 		let mut params = self.params.write().unwrap();
 		params.values[index as usize] = value;
 		params.changed = true;
@@ -245,7 +253,7 @@ impl Plugin for CinterPlugin {
 		"Boing".to_string()
 	}
 
-	fn get_preset_data(&mut self) -> Vec<u8> {
+	fn get_preset_data(&self) -> Vec<u8> {
 		let params = self.params.read().unwrap();
 		let mut data = vec![];
 		for p in &params.values {
@@ -254,11 +262,11 @@ impl Plugin for CinterPlugin {
 		data
 	}
 
-	fn get_bank_data(&mut self) -> Vec<u8> {
+	fn get_bank_data(&self) -> Vec<u8> {
 		self.get_preset_data()
 	}
 
-	fn load_preset_data(&mut self, data: &[u8]) {
+	fn load_preset_data(&self, data: &[u8]) {
 		let mut params = self.params.write().unwrap();
 		for (i, chunk) in data.chunks_exact(4).enumerate() {
 			let mut bytes = [0u8; 4];
@@ -268,7 +276,7 @@ impl Plugin for CinterPlugin {
 		params.changed = true;
 	}
 
-	fn load_bank_data(&mut self, data: &[u8]) {
+	fn load_bank_data(&self, data: &[u8]) {
 		self.load_preset_data(data);
 	}
 }
@@ -279,7 +287,7 @@ impl CinterPlugin {
 
 		match event.command {
 			MidiCommand::NoteOn { key, velocity, .. } => {
-				let mut params = self.params.write().unwrap();
+				let mut params = self.param_object.params.write().unwrap();
 				if params.changed {
 					self.instrument = Rc::new(RefCell::new(CinterInstrument::new(self.engine.clone(), &params.values)));
 					params.changed = false;
