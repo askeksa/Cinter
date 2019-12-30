@@ -221,6 +221,10 @@ impl Plugin for CinterPlugin {
 	fn set_sample_rate(&mut self, rate: f32) {
 		self.sample_rate = rate;
 	}
+
+	fn get_parameter_object(&mut self) -> Arc<dyn PluginParameters> {
+		Arc::clone(&mut self.param_object) as Arc<dyn PluginParameters>
+	}
 }
 
 impl PluginParameters for CinterParameterObject {
