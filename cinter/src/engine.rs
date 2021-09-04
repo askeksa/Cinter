@@ -1,6 +1,6 @@
 
 use std::f32::consts::PI;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub const PARAMETER_COUNT: usize = 12;
 
@@ -8,8 +8,9 @@ pub struct CinterEngine {
 	sine_table: Vec<i16>,
 }
 
+#[derive(Clone)]
 pub struct CinterInstrument {
-	engine: Rc<CinterEngine>,
+	engine: Arc<CinterEngine>,
 
 	attack: i32,
 	decay: i32,
@@ -23,6 +24,9 @@ pub struct CinterInstrument {
 	bdist: i32,
 	vpower: i32,
 	fdist: i32,
+
+	pub length: usize,
+	pub repeat_start: Option<usize>,
 
 	phase: i32,
 	amp: i32,
@@ -86,6 +90,10 @@ impl CinterEngine {
 		(text, label.to_string())
 	}
 
+	pub fn get_parameter_resolution(index: i32) -> f32 {
+		if index < 8 { 0.01 } else { 0.1 }
+	}
+
 	pub fn get_sample_filename(params: &[f32; PARAMETER_COUNT]) -> String {
 		let mut name = "1".to_string();
 		for i in 0..PARAMETER_COUNT {
@@ -113,7 +121,18 @@ impl CinterEngine {
 }
 
 impl CinterInstrument {
-	pub fn new(engine: Rc<CinterEngine>, params: &[f32; PARAMETER_COUNT]) -> Self {
+	pub fn new(
+		engine: Arc<CinterEngine>,
+		params: &[f32; PARAMETER_COUNT],
+		length: Option<usize>,
+		repeat_start: Option<usize>,
+	) -> Self {
+		let length = length.unwrap_or(65534);
+		let repeat_start = match repeat_start {
+			Some(start) if start >= length => None,
+			_ => repeat_start
+		};
+
 		let mut inst = CinterInstrument {
 			engine,
 
@@ -130,11 +149,14 @@ impl CinterInstrument {
 			vpower:      p10(params[10]),
 			fdist:       p10(params[11]),
 
+			length,
+			repeat_start,
+
 			phase:       0,
 			amp:         0,
 			amp_delta:   0,
 
-			data:        Vec::with_capacity(65534),
+			data:        Vec::with_capacity(length),
 		};
 
 		inst.data.push(0);
@@ -144,10 +166,25 @@ impl CinterInstrument {
 		inst
 	}
 
-	pub fn get_sample(&mut self, index: usize) -> i8 {
-		if index >= self.data.capacity() {
-			return 0;
+	pub fn repeated_index(&self, index: usize) -> Option<usize> {
+		if index < self.length {
+			Some(index)
+		} else {
+			self.repeat_start.map(|repeat_start| {
+				repeat_start + (index - self.length) % (self.length - repeat_start)
+			})
 		}
+	}
+
+	pub fn get_sample(&mut self, index: usize) -> i8 {
+		if let Some(index) = self.repeated_index(index) {
+			self.get_sample_raw(index)
+		} else {
+			0
+		}
+	}
+
+	pub fn get_sample_raw(&mut self, index: usize) -> i8 {
 		while self.data.len() <= index {
 			let sample = self.compute_sample();
 			self.data.push(sample);

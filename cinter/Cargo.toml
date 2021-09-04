@@ -1,5 +1,5 @@
 [package]
-name = "Cinter"
+name = "cinter"
 version = "4.0.0"
 authors = ["Aske Simon Christensen <askesc@gmail.com>"]
 edition = "2018"
@@ -9,5 +9,4 @@ vst = "0.2.0"
 nfd = { git = "https://github.com/saurvs/nfd-rs.git" }
 
 [lib]
-name = "cinter"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "lib"]

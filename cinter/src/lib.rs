@@ -1,12 +1,10 @@
 
-mod engine;
+pub mod engine;
 
-use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
-use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
 use vst::api::{Events, Supported};
@@ -49,36 +47,36 @@ pub struct TimedMidiCommand {
 	command: MidiCommand,
 }
 
-struct Note {
-	instrument: Rc<RefCell<CinterInstrument>>,
+pub struct Note {
+	instrument: Arc<RwLock<CinterInstrument>>,
 
 	time: usize,
-	tone: u8,
+	pub key: u8,
 	freq: f32,
 
 	release_time: Option<usize>
 }
 
 impl Note {
-	fn new(instrument: Rc<RefCell<CinterInstrument>>, tone: u8, _velocity: u8, sample_rate: f32) -> Note {
+	pub fn new(instrument: Arc<RwLock<CinterInstrument>>, key: u8, _velocity: u8, sample_rate: f32) -> Note {
 		Note {
 			instrument: instrument.clone(),
 			time: 0,
-			tone,
-			freq: 440.0 * ((tone + 27) as f32 / 12.0).exp2() / sample_rate,
+			key,
+			freq: 440.0 * ((key + 27) as f32 / 12.0).exp2() / sample_rate,
 
 			release_time: None
 		}
 	}
 
-	fn release_amplitude(&self) -> f32 {
+	pub fn release_amplitude(&self) -> f32 {
 		match self.release_time {
 			Some(release_time) => (1.0 - (self.time - release_time) as f32 * 0.001).max(0.0),
 			None => 1.0
 		}
 	}
 
-	fn produce_sample(&mut self) -> f32 {
+	pub fn produce_sample(&mut self) -> f32 {
 		let phase = self.time as f32 * self.freq;
 		let i = phase.floor() as usize;
 		let t = phase - i as f32;
@@ -86,7 +84,7 @@ impl Note {
 		let a1 = t*t*(3.0*t-5.0)+2.0;
 		let a2 = t*((4.0-3.0*t)*t+1.0);
 		let a3 = t*t*(t-1.0);
-		let mut instrument = self.instrument.borrow_mut();
+		let mut instrument = self.instrument.write().unwrap();
 		let d0 = instrument.get_sample(i) as f32;
 		let d1 = instrument.get_sample(i + 1) as f32;
 		let d2 = instrument.get_sample(i + 2) as f32;
@@ -97,15 +95,20 @@ impl Note {
 		v / 254.0
 	}
 
-	fn release(&mut self, _velocity: u8) {
+	pub fn current_index(&self) -> usize {
+		let phase = self.time as f32 * self.freq;
+		phase.floor() as usize
+	}
+
+	pub fn release(&mut self, _velocity: u8) {
 		self.release_time = Some(self.time);
 	}
 
-	fn is_released(&self) -> bool {
+	pub fn is_released(&self) -> bool {
 		self.release_time.is_some()
 	}
 
-	fn is_alive(&self) -> bool {
+	pub fn is_alive(&self) -> bool {
 		self.release_amplitude() > 0.0
 	}
 }
@@ -119,8 +122,8 @@ pub struct CinterPlugin {
 	notes: Vec<Note>,
 	events: VecDeque<TimedMidiCommand>,
 
-	engine: Rc<CinterEngine>,
-	instrument: Rc<RefCell<CinterInstrument>>,
+	engine: Arc<CinterEngine>,
+	instrument: Arc<RwLock<CinterInstrument>>,
 }
 
 pub struct CinterParameterObject {
@@ -140,8 +143,10 @@ impl Default for CinterPlugin {
 			],
 			changed: false,
 		};
-		let engine = Rc::new(CinterEngine::new());
-		let instrument = Rc::new(RefCell::new(CinterInstrument::new(engine.clone(), &params.values)));
+		let engine = Arc::new(CinterEngine::new());
+		let instrument = Arc::new(RwLock::new(CinterInstrument::new(
+			engine.clone(), &params.values, None, None
+		)));
 
 		CinterPlugin {
 			param_object: Arc::new(CinterParameterObject {
@@ -293,7 +298,9 @@ impl CinterPlugin {
 			MidiCommand::NoteOn { key, velocity, .. } => {
 				let mut params = self.param_object.params.write().unwrap();
 				if params.changed {
-					self.instrument = Rc::new(RefCell::new(CinterInstrument::new(self.engine.clone(), &params.values)));
+					self.instrument = Arc::new(RwLock::new(CinterInstrument::new(
+						self.engine.clone(), &params.values, None, None
+					)));
 					params.changed = false;
 				}
 				self.notes.push(Note::new(self.instrument.clone(), key, velocity, self.sample_rate));
@@ -304,7 +311,7 @@ impl CinterPlugin {
 			},
 			MidiCommand::NoteOff { key, velocity, .. } => {
 				for note in &mut self.notes {
-					if note.tone == key && !note.is_released() {
+					if note.key == key && !note.is_released() {
 						note.release(velocity);
 						break;
 					}
@@ -327,7 +334,7 @@ impl CinterPlugin {
 			if let Ok(Response::Okay(path)) = open_pick_folder(None) {
 				let full_path = Path::new(&path).join(filename);
 				if let Ok(mut file) = File::create(&full_path) {
-					let mut instrument = self.instrument.borrow_mut();
+					let mut instrument = self.instrument.write().unwrap();
 					let data: Vec<u8> = (0..65534).map(|i| {
 						instrument.get_sample(i) as u8
 					}).collect();
