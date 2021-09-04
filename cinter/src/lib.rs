@@ -13,7 +13,7 @@ use vst::event::{Event, MidiEvent};
 use vst::plugin::{CanDo, Category, HostCallback, Info, Plugin, PluginParameters};
 use vst::plugin_main;
 
-use nfd::{open_pick_folder, Response};
+use rfd::FileDialog;
 
 use crate::engine::PARAMETER_COUNT;
 use crate::engine::{CinterEngine, CinterInstrument};
@@ -331,7 +331,7 @@ impl CinterPlugin {
 		}
 
 		if let Some(filename) = write_filename {
-			if let Ok(Response::Okay(path)) = open_pick_folder(None) {
+			if let Some(path) = FileDialog::new().pick_folder() {
 				let full_path = Path::new(&path).join(filename);
 				if let Ok(mut file) = File::create(&full_path) {
 					let mut instrument = self.instrument.write().unwrap();

@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 vst = "0.2.0"
-nfd = { git = "https://github.com/saurvs/nfd-rs.git" }
+rfd = "0.4.4"
 
 [lib]
 crate-type = ["cdylib", "lib"]
