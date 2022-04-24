@@ -118,6 +118,56 @@ impl CinterEngine {
 		}
 		name + ".raw"
 	}
+
+	pub fn parameters_from_sample_filename(name: &str) -> anyhow::Result<[f32; PARAMETER_COUNT]> {
+		let legacy = !name.starts_with('1');
+		let mut params = [0f32; PARAMETER_COUNT];
+		for i in 0..PARAMETER_COUNT {
+			if i < 8 {
+				let digits: &str = name.get(i * 2 + 1 .. i * 2 + 3).ok_or(anyhow::anyhow!("Name too short"))?;
+				params[i] = if digits.eq_ignore_ascii_case("XX") {
+					100
+				} else {
+					digits.parse::<i32>()?
+				} as f32 * 0.01;
+			} else {
+				let digit = name.get(i + 9 .. i + 10).ok_or(anyhow::anyhow!("Name too short"))?;
+				params[i] = if digit.eq_ignore_ascii_case("X") {
+					10
+				} else {
+					digit.parse::<i32>()?
+				} as f32 * 0.1;
+			};
+		}
+
+		if legacy {
+			fn convert3to4(value: f32, fun3: &mut impl FnMut(f32) -> u32,  fun4: &mut impl FnMut(f32) -> u32) -> f32 {
+				let target = fun3(value);
+				let ((low, lowval), (high, highval)) = binary_search::binary_search((0, fun4(0.0)), (100, fun4(1.0)), |v| {
+					let val = fun4(v as f32 * 0.01);
+					if val < target {
+						binary_search::Direction::Low(val)
+					} else {
+						binary_search::Direction::High(val)
+					}
+				});
+				let v = if target - lowval < highval - target {
+					low
+				} else {
+					high
+				};
+				v as f32 * 0.01
+			}
+
+			params[2] = convert3to4(params[2], &mut pitchfun3, &mut pitchfun);
+			params[3] = convert3to4(params[3], &mut decayfun3, &mut decayfun);
+			params[4] = convert3to4(params[4], &mut pitchfun3, &mut pitchfun);
+			params[5] = convert3to4(params[5], &mut decayfun3, &mut decayfun);
+			params[7] = convert3to4(params[7], &mut decayfun3, &mut decayfun);
+		}
+
+		Ok(params)
+	}
 }
 
 impl CinterInstrument {
@@ -259,7 +309,16 @@ fn pitchfun(value: f32) -> u32 {
 	}
 }
 
+fn pitchfun3(value: f32) -> u32 {
+	(p100(value) * 512) as u32
+}
+
 fn decayfun(value: f32) -> u32 {
 	let v = p100(value) as f32 / 50.0 - 1.0;
 	return ((0.0008 * v + 0.1 * v.powi(7)).exp() * 65536.0).round() as u32
+}
+
+fn decayfun3(value: f32) -> u32 {
+	let v = p100(value) as f32;
+	((-0.000002 * v * v).exp() * 65536.0).round() as u32
 }

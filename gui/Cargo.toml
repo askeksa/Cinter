@@ -1,0 +1,13 @@
+[package]
+name = "cinter_gui"
+version = "4.0.0"
+authors = ["Aske Simon Christensen <askesc@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+eframe = "0.16.0"
+cpal = "0.11.0"
+retain_mut = "0.1.3"
+
+cinter = { path = "../cinter" }

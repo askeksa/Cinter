@@ -5,6 +5,8 @@ authors = ["Aske Simon Christensen <askesc@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0"
+binary-search = "0.1.2"
 vst = "0.2.0"
 rfd = "0.4.4"
 
