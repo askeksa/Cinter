@@ -13,6 +13,8 @@ use retain_mut::RetainMut;
 
 use cinter::engine::{CinterEngine, CinterInstrument, PARAMETER_COUNT};
 
+const TITLE: &'static str = "Cinter 4.0 by Blueberry";
+
 pub struct CinterApp {
 	player: SyncSender<PlayerMessage>,
 	cursors: Vec<Arc<AtomicUsize>>,
@@ -30,6 +32,17 @@ pub struct CinterApp {
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum Octaves { Low, High }
+
+enum FileFormat { Raw, Iff }
+
+impl FileFormat {
+	fn extension(&self) -> &'static str {
+		match self {
+			FileFormat::Raw => ".raw",
+			FileFormat::Iff => ".8svx",
+		}
+	}
+}
 
 struct PlayerState {
 	instrument: Option<Arc<RwLock<CinterInstrument>>>,
@@ -186,11 +199,38 @@ impl CinterApp {
 		sender
 	}
 
-	fn save_sample(&mut self) -> std::io::Result<()> {
+	fn save_sample(&mut self, format: FileFormat) -> std::io::Result<()> {
 		let filename = CinterEngine::get_sample_filename(&self.current_params);
-		let mut file = File::create(filename).unwrap();
+		let mut file = File::create(filename.clone() + format.extension())?;
 		let data: Vec<u8> = (0..self.length).map(|i| self.current_instrument.get_sample(i) as u8).collect();
-		file.write_all(&data)
+		match format {
+			FileFormat::Raw => file.write_all(&data),
+			FileFormat::Iff => {
+				let mut w = crate::iff::IffWriter::new();
+				w.write_chunk("FORM", |w| {
+					w.write_bytes("8SVX");
+					w.write_chunk("VHDR", |w| {
+						w.write_u32((self.length - self.repeat_length) as u32); // oneShotHiSamples
+						w.write_u32(self.repeat_length as u32); // repeatHiSamples
+						w.write_u32(32); // samplesPerHiCycle
+						w.write_u16(16726); // samplesPerSec
+						w.write_u8(1); // ctOctave
+						w.write_u8(0); // sCompression
+						w.write_u32(0x10000); // volume
+					});
+					w.write_chunk("NAME", |w| {
+						w.write_string_padded(filename.as_str());
+					});
+					w.write_chunk("ANNO", |w| {
+						w.write_string_padded(TITLE);
+					});
+					w.write_chunk("BODY", |w| {
+						w.write_bytes(data);
+					});
+				});
+				file.write_all(w.get_data())
+			},
+		}
 	}
 
 	fn auto_length(&mut self) -> i32 {
@@ -211,7 +251,7 @@ fn with_width(ui: &mut egui::Ui, width: f32, add_contents: impl FnOnce(&mut egui
 
 impl epi::App for CinterApp {
 	fn name(&self) -> &str {
-		"Cinter by Blueberry"
+		TITLE
 	}
 
 	fn update(&mut self, ctx: &egui::Context, _frame: &epi::Frame) {
@@ -250,8 +290,14 @@ impl epi::App for CinterApp {
 			ui.separator();
 
 			ui.horizontal(|ui| {
-				if ui.button("Save").clicked() {
-					match self.save_sample() {
+				if ui.button("Save as RAW").clicked() {
+					match self.save_sample(FileFormat::Raw) {
+						Ok(..) => self.error_string = None,
+						Err(err) => self.error_string = Some(format!("{}", err)),
+					}
+				}
+				if ui.button("Save as 8SVX").clicked() {
+					match self.save_sample(FileFormat::Iff) {
 						Ok(..) => self.error_string = None,
 						Err(err) => self.error_string = Some(format!("{}", err)),
 					}

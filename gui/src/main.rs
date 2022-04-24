@@ -1,4 +1,5 @@
 mod app;
+mod iff;
 
 use eframe::{NativeOptions, run_native};
 use eframe::egui::Vec2;

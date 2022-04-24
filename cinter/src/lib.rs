@@ -332,7 +332,7 @@ impl CinterPlugin {
 
 		if let Some(filename) = write_filename {
 			if let Some(path) = FileDialog::new().pick_folder() {
-				let full_path = Path::new(&path).join(filename);
+				let full_path = Path::new(&path).join(filename + ".raw");
 				if let Ok(mut file) = File::create(&full_path) {
 					let mut instrument = self.instrument.write().unwrap();
 					let data: Vec<u8> = (0..65534).map(|i| {

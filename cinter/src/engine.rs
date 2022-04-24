@@ -116,7 +116,7 @@ impl CinterEngine {
 			};
 			name += &repr;
 		}
-		name + ".raw"
+		name
 	}
 
 	pub fn parameters_from_sample_filename(name: &str) -> anyhow::Result<[f32; PARAMETER_COUNT]> {
