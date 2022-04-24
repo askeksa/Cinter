@@ -214,9 +214,15 @@ impl epi::App for CinterApp {
 		"Cinter by Blueberry"
 	}
 
-	fn update(&mut self, ctx: &egui::CtxRef, _frame: &epi::Frame) {
+	fn update(&mut self, ctx: &egui::Context, _frame: &epi::Frame) {
 		egui::CentralPanel::default().show(ctx, |ui| {
-			ui.heading("Parameters");
+
+			ui.horizontal(|ui| {
+				ui.heading("Parameters");
+				ui.with_layout(egui::Layout::right_to_left(), |ui| {
+					egui::widgets::global_dark_light_mode_buttons(ui);
+				});
+			});
 			ui.separator();
 
 			let old_params = self.current_params;

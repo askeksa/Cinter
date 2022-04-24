@@ -2,13 +2,13 @@
 name = "cinter"
 version = "4.0.0"
 authors = ["Aske Simon Christensen <askesc@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
 binary-search = "0.1.2"
-vst = "0.2.0"
-rfd = "0.4.4"
+vst = "0.3.0"
+rfd = "0.8.2"
 
 [lib]
 crate-type = ["cdylib", "lib"]
