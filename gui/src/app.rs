@@ -13,21 +13,28 @@ use retain_mut::RetainMut;
 
 use cinter::engine::{CinterEngine, CinterInstrument, PARAMETER_COUNT};
 
+use crate::iff::{IffReader, IffWriter};
+
 const TITLE: &'static str = "Cinter 4.0 by Blueberry";
 
 pub struct CinterApp {
 	player: SyncSender<PlayerMessage>,
 	cursors: Vec<Arc<AtomicUsize>>,
 
+	params: CinterParameters,
+
 	engine: Arc<CinterEngine>,
-	current_params: [f32; PARAMETER_COUNT],
 	current_instrument: CinterInstrument,
-	length: usize,
-	repeat_length: usize,
 	octaves: Octaves,
 	volume: f32,
 
 	error_string: Option<String>,
+}
+
+pub struct CinterParameters {
+	values: [f32; PARAMETER_COUNT],
+	length: usize,
+	repeat_length: usize,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -89,11 +96,14 @@ impl CinterApp {
 			player,
 			cursors: vec![],
 
+			params: CinterParameters {
+				values: params,
+				length,
+				repeat_length: 0,
+			},
+
 			engine,
-			current_params: params,
 			current_instrument,
-			length,
-			repeat_length: 0,
 			octaves: Octaves::High,
 			volume: 1.0,
 
@@ -108,8 +118,8 @@ impl CinterApp {
 	}
 
 	fn repeat_start(&self) -> Option<usize> {
-		if self.repeat_length > 0 && self.repeat_length <= self.length {
-			Some(self.length - self.repeat_length)
+		if self.params.repeat_length > 0 && self.params.repeat_length <= self.params.length {
+			Some(self.params.length - self.params.repeat_length)
 		} else {
 			None
 		}
@@ -200,18 +210,18 @@ impl CinterApp {
 	}
 
 	fn save_sample(&mut self, format: FileFormat) -> std::io::Result<()> {
-		let filename = CinterEngine::get_sample_filename(&self.current_params);
+		let filename = CinterEngine::get_sample_filename(&self.params.values);
 		let mut file = File::create(filename.clone() + format.extension())?;
-		let data: Vec<u8> = (0..self.length).map(|i| self.current_instrument.get_sample(i) as u8).collect();
+		let data: Vec<u8> = (0..self.params.length).map(|i| self.current_instrument.get_sample(i) as u8).collect();
 		match format {
 			FileFormat::Raw => file.write_all(&data),
 			FileFormat::Iff => {
-				let mut w = crate::iff::IffWriter::new();
+				let mut w = IffWriter::new();
 				w.write_chunk("FORM", |w| {
 					w.write_bytes("8SVX");
 					w.write_chunk("VHDR", |w| {
-						w.write_u32((self.length - self.repeat_length) as u32); // oneShotHiSamples
-						w.write_u32(self.repeat_length as u32); // repeatHiSamples
+						w.write_u32((self.params.length - self.params.repeat_length) as u32); // oneShotHiSamples
+						w.write_u32(self.params.repeat_length as u32); // repeatHiSamples
 						w.write_u32(32); // samplesPerHiCycle
 						w.write_u16(16726); // samplesPerSec
 						w.write_u8(1); // ctOctave
@@ -230,6 +240,36 @@ impl CinterApp {
 				});
 				file.write_all(w.get_data())
 			},
+		}
+	}
+
+	fn load_sample(&mut self, filename: &str) -> anyhow::Result<CinterParameters> {
+		let mut data = vec![];
+		File::open(filename)?.read_to_end(&mut data)?;
+		if let Ok([b'8', b'S', b'V', b'X', chunks @ ..]) = IffReader::find_chunk(&data, "FORM") {
+			// 8SVX file
+			let header = IffReader::find_chunk(chunks, "VHDR")?;
+			let once_length = u32::from_be_bytes(header[0..4].try_into()?) as usize;
+			let repeat_length = u32::from_be_bytes(header[4..8].try_into()?) as usize;
+			let length = once_length + repeat_length;
+			let name = match IffReader::find_chunk(chunks, "NAME") {
+				Ok(name) => std::str::from_utf8(name)?,
+				_ => filename,
+			};
+			let param_values = CinterEngine::parameters_from_sample_filename(name)?;
+			Ok(CinterParameters {
+				values: param_values,
+				length,
+				repeat_length,
+			})
+		} else {
+			// RAW file
+			let param_values = CinterEngine::parameters_from_sample_filename(filename)?;
+			Ok(CinterParameters {
+				values: param_values,
+				length: data.len(),
+				repeat_length: 0,
+			})
 		}
 	}
 
@@ -265,10 +305,10 @@ impl epi::App for CinterApp {
 			});
 			ui.separator();
 
-			let old_params = self.current_params;
+			let old_params = self.params.values;
 
 			for p in 0..PARAMETER_COUNT {
-				let param = &mut self.current_params[p];
+				let param = &mut self.params.values[p];
 				let resolution = CinterEngine::get_parameter_resolution(p as i32);
 				ui.horizontal(|ui| {
 					let (value, label) = CinterEngine::get_parameter_text_and_label(p as i32, *param);
@@ -302,7 +342,7 @@ impl epi::App for CinterApp {
 						Err(err) => self.error_string = Some(format!("{}", err)),
 					}
 				}
-				ui.add(egui::Label::new(CinterEngine::get_sample_filename(&self.current_params)));
+				ui.add(egui::Label::new(CinterEngine::get_sample_filename(&self.params.values)));
 				if let Some(err) = &self.error_string {
 					ui.add(egui::Label::new(egui::RichText::new(err).color(egui::Color32::RED)));
 				}
@@ -317,9 +357,9 @@ impl epi::App for CinterApp {
 
 			let mut lines = vec![];
 			let mut prev_pos = None;
-			for i in 0..self.length {
+			for i in 0..self.params.length {
 				let sample = self.current_instrument.get_sample(i as usize);
-				let x = i as f32 * plot_size.x / self.length as f32;
+				let x = i as f32 * plot_size.x / self.params.length as f32;
 				let y = (130 - sample as i32) as f32 * plot_size.y / 260.0;
 				let pos = egui::Pos2 { x: rect.min.x + x, y: rect.min.y + y };
 				if let Some(prev_pos) = prev_pos {
@@ -330,7 +370,7 @@ impl epi::App for CinterApp {
 				}
 				prev_pos = Some(pos);
 			}
-			let length = self.length;
+			let length = self.params.length;
 			let mut vline = |index: usize, color: egui::Color32| {
 				let x = index as f32 * plot_size.x / length as f32;
 				let points = [
@@ -370,11 +410,11 @@ impl epi::App for CinterApp {
 				  .max_decimals(0)
 			}
 
-			let old_length = self.length;
+			let old_length = self.params.length;
 			let old_repeat_start = self.repeat_start();
 			ui.horizontal(|ui| {
 				ui.group(|ui| {
-					let mut length = self.length as i32;
+					let mut length = self.params.length as i32;
 					ui.add(egui::Label::new(egui::RichText::new("Length: ").text_style(egui::TextStyle::Button)));
 					ui.add(make_adjuster(&mut length, 0 ..= 65534));
 					if ui.button("➖").clicked() {
@@ -386,20 +426,20 @@ impl epi::App for CinterApp {
 					if ui.button("auto").clicked() {
 						length = self.auto_length();
 					}
-					self.length = length as usize;
+					self.params.length = length as usize;
 				});
 
 				ui.group(|ui| {
-					let mut repeat_length = self.repeat_length as i32;
+					let mut repeat_length = self.params.repeat_length as i32;
 					ui.add(egui::Label::new(egui::RichText::new("Repeat: ").text_style(egui::TextStyle::Button)));
-					ui.add(make_adjuster(&mut repeat_length, 0 ..= self.length));
+					ui.add(make_adjuster(&mut repeat_length, 0 ..= self.params.length));
 					if ui.button("➖").clicked() {
 						repeat_length = (repeat_length - 2).max(0);
 					}
 					if ui.button("➕").clicked() {
-						repeat_length = (repeat_length + 2).min(self.length as i32);
+						repeat_length = (repeat_length + 2).min(self.params.length as i32);
 					}
-					self.repeat_length = repeat_length as usize;
+					self.params.repeat_length = repeat_length as usize;
 				});
 
 				ui.group(|ui| {
@@ -424,15 +464,13 @@ impl epi::App for CinterApp {
 
 			for file in &ctx.input().raw.dropped_files {
 				if let Some(name) = file.path.as_ref().and_then(|f| f.file_name()).and_then(|n| n.to_str()) {
-					match CinterEngine::parameters_from_sample_filename(name) {
+					match self.load_sample(name) {
 						Ok(params) => {
 							self.error_string = None;
-							self.current_params = params;
+							self.params = params;
 							self.current_instrument = CinterInstrument::new(
-								self.engine.clone(), &self.current_params, None, None
+								self.engine.clone(), &self.params.values, None, None
 							);
-							self.length = self.auto_length() as usize;
-							self.repeat_length = 0;
 						},
 						Err(err) => {
 							self.error_string = Some(format!("{}", err));
@@ -441,10 +479,10 @@ impl epi::App for CinterApp {
 				}
 			}
 
-			if self.length != old_length || self.repeat_start() != old_repeat_start || self.current_params != old_params {
+			if self.params.length != old_length || self.repeat_start() != old_repeat_start || self.params.values != old_params {
 				self.error_string = None;
 				self.current_instrument = CinterInstrument::new(
-					self.engine.clone(), &self.current_params, Some(self.length), self.repeat_start()
+					self.engine.clone(), &self.params.values, Some(self.params.length), self.repeat_start()
 				);
 				self.player.send(PlayerMessage::Instrument { instrument: self.current_instrument.clone() }).ok();
 			}

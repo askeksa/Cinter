@@ -45,3 +45,24 @@ impl IffWriter {
 		self.write_bytes(vec![0; 4 - (value.len() & 3)]);
 	}
 }
+
+pub struct IffReader;
+
+impl IffReader {
+	pub fn find_chunk<'d>(data: &'d [u8], id: &str) -> anyhow::Result<&'d [u8]> {
+		let mut index = 0;
+		while index < data.len() - 8 {
+			let chunk = &data[index .. index + 4];
+			let length = u32::from_be_bytes(data[index + 4 .. index + 8].try_into().unwrap()) as usize;
+			let start = index + 8;
+			if length > data.len() - start {
+				return Err(anyhow::anyhow!("{} chunk truncated", String::from_utf8_lossy(chunk)));
+			}
+			if chunk == id.as_bytes() {
+				return Ok(&data[start .. start + length]);
+			}
+			index = start + length;
+		}
+		Err(anyhow::anyhow!("Could not find {} chunk", id))
+	}
+}
