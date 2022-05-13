@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{sync_channel, SyncSender};
 use std::sync::{Arc, RwLock};
 
-use eframe::{egui, epi};
+use eframe::egui;
 use egui::{Event, Key};
 
 use cpal::traits::{DeviceTrait, HostTrait, EventLoopTrait};
@@ -15,7 +15,7 @@ use cinter::engine::{CinterEngine, CinterInstrument, PARAMETER_COUNT};
 
 use crate::iff::{IffReader, IffWriter};
 
-const TITLE: &'static str = "Cinter 4.1 by Blueberry";
+pub const TITLE: &'static str = "Cinter 4.1 by Blueberry";
 
 pub struct CinterApp {
 	player: SyncSender<PlayerMessage>,
@@ -81,7 +81,7 @@ fn translate_key(key: Key) -> Option<u8> {
 }
 
 impl CinterApp {
-	pub fn init() -> Self {
+	pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
 		let player = Self::start_player();
 		let engine = Arc::new(CinterEngine::new());
 		let params = [
@@ -289,12 +289,8 @@ fn with_width(ui: &mut egui::Ui, width: f32, add_contents: impl FnOnce(&mut egui
 	});
 }
 
-impl epi::App for CinterApp {
-	fn name(&self) -> &str {
-		TITLE
-	}
-
-	fn update(&mut self, ctx: &egui::Context, _frame: &epi::Frame) {
+impl eframe::App for CinterApp {
+	fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
 		egui::CentralPanel::default().show(ctx, |ui| {
 
 			ui.horizontal(|ui| {

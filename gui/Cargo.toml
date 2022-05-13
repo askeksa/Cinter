@@ -6,7 +6,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
-eframe = "0.17.0"
+eframe = "0.18.0"
 cpal = "0.11.0"
 retain_mut = "0.1.3"
 
