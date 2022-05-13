@@ -1,6 +1,6 @@
 [package]
 name = "cinter"
-version = "4.0.0"
+version = "4.1.0"
 authors = ["Aske Simon Christensen <askesc@gmail.com>"]
 edition = "2021"
 
