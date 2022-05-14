@@ -1,42 +1,19 @@
 
 Cinter is a software synthesizer designed for use in Amiga 4k intros.
 
-The synth has three conponents:
-- A VST instrument for creating sounds
-- A script for converting music
-- Replay code for inclusion in your intro
-
-You will need:
-- A Windows computer (or a way to use Windows VSTs)
-- A suitable VST host
-- Protracker, or a compatible tracker
-- Python 2.x, where x >= 5
-- An assembler, but you would need that for the intro anyway. :)
-
-
 To use the synth, you need to follow these steps:
-1. Locate the VST plugin for your OS in the vst directory and install it in
-   your favorite VST host. For example, in Renoise, you need to place it in a
-   directory mentioned under VST Plugins in the Plug/Misc settings.
-   The VST host must provide a GUI for generic VST parameters which can adjust
-   parameter values at 0.01 precision.
-2. Select the VST for an instrument and adjust parameters to your liking.
-   Test the sound using the notes C-1 to B-3, which correspond to the same
-   notes in Protracker on the Amiga.
-3. When satisfied with an instrument, play an E-4 note. This will open a
-   directory selection dialog, where you can choose where to save the sample.
-   A raw 8-bit sample will be saved into the chosen directory. The name of
-   the file contains an encoding of all the parameters.
-4. Use these samples to make music in Protracker (or another tracker capable of
+1. Use the Cinter GUI application to create samples and save them in RAW or
+   8SVX format.
+2. Use these samples to make music in Protracker (or another tracker capable of
    saving in Protracker format).
-5. Run the CinterConvert.py script on the Protracker module. It will output
+3. Run the CinterConvert.py script on the Protracker module. It will output
    binary files to be included in your intro.
-6. Include the Cinter4.S source file and the binary output files from the
+4. Include the Cinter4.S source file and the binary output files from the
    conversion script in your intro and use them as prescribed. See the
    Cinter4Test.S file for a usage example.
 
 
-USING THE VST
+USING THE GUI
 
 Cinter is a simple, two-oscillator phase modulation synth. It has the following
 parameters:
@@ -62,13 +39,6 @@ vpower (Volume envelope Power):
   How quickly the volume envelope falls off.
 fdist (Final Distortion):
   Amplifies and distorts the sound after application of the volume envelope.
-
-You can easily convert back from a saved sample to the original parameters:
-- The first character is a version indicator. If this is a number, the sample
-  was produced by Cinter 4, otherwise by Cinter 3.
-- For the first 8 parameters, divide two digits by 100. XX means 1.
-- For the last 4 parameters, divide one digit by 10. X means 1.
-Enter this result as the underlying parameter value (not the one shown).
 
 
 PROTRACKER GUIDELINES
