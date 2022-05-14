@@ -81,7 +81,11 @@ fn translate_key(key: Key) -> Option<u8> {
 }
 
 impl CinterApp {
-	pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+	pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+		if cc.integration_info.prefer_dark_mode.is_none() {
+			cc.egui_ctx.set_visuals(egui::Visuals::dark());
+		}
+
 		let player = Self::start_player();
 		let engine = Arc::new(CinterEngine::new());
 		let params = [
