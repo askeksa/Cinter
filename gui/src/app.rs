@@ -346,6 +346,12 @@ impl eframe::App for CinterApp {
 
 			ui.separator();
 
+			let (plot_col, loop_col, cursor_col) = if ui.style().visuals.dark_mode {
+				(egui::Color32::LIGHT_BLUE, egui::Color32::WHITE, egui::Color32::YELLOW)
+			} else {
+				(egui::Color32::DARK_BLUE, egui::Color32::BLACK, egui::Color32::BROWN)
+			};
+
 			let plot_size = egui::Vec2 { x: ui.available_width(), y: 220.0 };
 			let (_response, painter) =
 				ui.allocate_painter(plot_size, egui::Sense::drag());
@@ -361,7 +367,7 @@ impl eframe::App for CinterApp {
 				if let Some(prev_pos) = prev_pos {
 					lines.push(egui::Shape::LineSegment {
 						points: [prev_pos, pos],
-						stroke: egui::Stroke { width: 0.8, color: egui::Color32::LIGHT_BLUE },
+						stroke: egui::Stroke { width: 0.8, color: plot_col },
 					});
 				}
 				prev_pos = Some(pos);
@@ -383,12 +389,12 @@ impl eframe::App for CinterApp {
 				if Arc::strong_count(cursor) == 1 {
 					false
 				} else {
-					vline(cursor.load(Ordering::Relaxed), egui::Color32::YELLOW);
+					vline(cursor.load(Ordering::Relaxed), cursor_col);
 					true
 				}
 			});
 			if let Some(repeat_start) = self.repeat_start() {
-				vline(repeat_start, egui::Color32::WHITE);
+				vline(repeat_start, loop_col);
 			}
 			painter.add(egui::Shape::Vec(lines));
 
