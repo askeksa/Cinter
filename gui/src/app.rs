@@ -9,7 +9,6 @@ use eframe::egui;
 use egui::{Event, Key};
 
 use cpal::traits::{DeviceTrait, HostTrait, EventLoopTrait};
-use retain_mut::RetainMut;
 
 use cinter::engine::{CinterEngine, CinterInstrument, PARAMETER_COUNT};
 
