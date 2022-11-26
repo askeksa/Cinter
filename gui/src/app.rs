@@ -279,6 +279,14 @@ impl CinterApp {
 		}
 	}
 
+	fn set_random_parameters(&mut self) {
+		let mut random = thread_rng();
+		for p in 0..PARAMETER_COUNT {
+			self.params.values[p] = random.gen::<f32>()
+		}
+		self.params.repeat_length = 0;
+	}
+
 	fn compute_length(instrument: &mut CinterInstrument) -> usize {
 		let mut length = 65534usize;
 		while length > 2 && instrument.get_sample_raw(length - 1) == 0 {
@@ -307,11 +315,13 @@ impl eframe::App for CinterApp {
 			ui.horizontal(|ui| {
 				ui.heading("Parameters");
 				if ui.button("Random").clicked() {
-					let mut random = thread_rng();
-					for p in 0..PARAMETER_COUNT {
-						self.params.values[p] = random.gen::<f32>()
-					}
-					self.params.repeat_length = 0;
+					self.set_random_parameters();
+				}
+				if ui.button("Random melodic").clicked() {
+					self.set_random_parameters();
+					self.params.values[3] = 0.5;
+					self.params.values[5] = 0.5;
+					self.params.values[7] *= 0.5;
 				}
 				ui.with_layout(egui::Layout::right_to_left(), |ui| {
 					egui::widgets::global_dark_light_mode_buttons(ui);
