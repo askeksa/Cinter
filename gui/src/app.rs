@@ -22,6 +22,7 @@ pub struct CinterApp {
 	cursors: Vec<Arc<AtomicUsize>>,
 
 	params: CinterParameters,
+	auto_length: bool,
 
 	engine: Arc<CinterEngine>,
 	current_instrument: CinterInstrument,
@@ -91,10 +92,10 @@ impl CinterApp {
 		let params = [
 			0.05, 0.40, 0.53, 0.50, 0.65, 0.50, 0.20, 0.40, 0.0, 0.0, 0.1, 0.2
 		];
-		let length = 8192;
 
-		let current_instrument = CinterInstrument::new(Arc::clone(&engine), &params, Some(length), None);
+		let mut current_instrument = CinterInstrument::new(Arc::clone(&engine), &params, None, None);
 		player.send(PlayerMessage::Instrument { instrument: current_instrument.clone() }).ok();
+		let length = Self::compute_length(&mut current_instrument);
 
 		Self {
 			player,
@@ -105,6 +106,7 @@ impl CinterApp {
 				length,
 				repeat_length: 0,
 			},
+			auto_length: true,
 
 			engine,
 			current_instrument,
@@ -277,12 +279,12 @@ impl CinterApp {
 		}
 	}
 
-	fn auto_length(&mut self) -> i32 {
-		let mut length = 65534i32;
-		while length > 2 && self.current_instrument.get_sample_raw((length - 1) as usize) == 0 {
+	fn compute_length(instrument: &mut CinterInstrument) -> usize {
+		let mut length = 65534usize;
+		while length > 2 && instrument.get_sample_raw(length - 1) == 0 {
 			length -= 1;
 		}
-		(length + 1) & -2
+		(length + 1) & !1
 	}
 }
 
@@ -300,6 +302,7 @@ impl eframe::App for CinterApp {
 			let old_params = self.params.values;
 			let old_length = self.params.length;
 			let old_repeat_start = self.repeat_start();
+			let old_auto_length = self.auto_length;
 
 			ui.horizontal(|ui| {
 				ui.heading("Parameters");
@@ -308,10 +311,6 @@ impl eframe::App for CinterApp {
 					for p in 0..PARAMETER_COUNT {
 						self.params.values[p] = random.gen::<f32>()
 					}
-					self.current_instrument = CinterInstrument::new(
-						self.engine.clone(), &self.params.values, None, None
-					);
-					self.params.length = self.auto_length() as usize;
 					self.params.repeat_length = 0;
 				}
 				ui.with_layout(egui::Layout::right_to_left(), |ui| {
@@ -433,16 +432,16 @@ impl eframe::App for CinterApp {
 				ui.group(|ui| {
 					let mut length = self.params.length as i32;
 					ui.add(egui::Label::new(egui::RichText::new("Length: ").text_style(egui::TextStyle::Button)));
-					ui.add(make_adjuster(&mut length, 0 ..= 65534));
-					if ui.button("➖").clicked() {
-						length = (length - 2).max(0);
-					}
-					if ui.button("➕").clicked() {
-						length = (length + 2).min(65534);
-					}
-					if ui.button("auto").clicked() {
-						length = self.auto_length();
-					}
+					ui.add_enabled_ui(!self.auto_length, |ui| {
+						ui.add(make_adjuster(&mut length, 0 ..= 65534));
+						if ui.button("➖").clicked() {
+							length = (length - 2).max(0);
+						}
+						if ui.button("➕").clicked() {
+							length = (length + 2).min(65534);
+						}
+					});
+					ui.checkbox(&mut self.auto_length, "Auto");
 					self.params.length = length as usize;
 				});
 
@@ -488,6 +487,7 @@ impl eframe::App for CinterApp {
 							self.current_instrument = CinterInstrument::new(
 								self.engine.clone(), &self.params.values, None, None
 							);
+							self.auto_length = self.params.length == Self::compute_length(&mut self.current_instrument);
 						},
 						Err(err) => {
 							self.error_string = Some(format!("{}", err));
@@ -496,11 +496,18 @@ impl eframe::App for CinterApp {
 				}
 			}
 
-			if self.params.length != old_length || self.repeat_start() != old_repeat_start || self.params.values != old_params {
+			if self.params.length != old_length ||
+					self.repeat_start() != old_repeat_start ||
+					self.params.values != old_params ||
+					self.auto_length != old_auto_length {
 				self.error_string = None;
 				self.current_instrument = CinterInstrument::new(
 					self.engine.clone(), &self.params.values, Some(self.params.length), self.repeat_start()
 				);
+				if self.auto_length {
+					self.params.length = Self::compute_length(&mut self.current_instrument);
+					self.current_instrument.length = self.params.length;
+				}
 				self.player.send(PlayerMessage::Instrument { instrument: self.current_instrument.clone() }).ok();
 			}
 
