@@ -7,6 +7,7 @@ use std::sync::{Arc, RwLock};
 
 use eframe::egui;
 use egui::{Event, Key};
+use rand::{thread_rng, Rng};
 
 use cpal::traits::{DeviceTrait, HostTrait, EventLoopTrait};
 
@@ -296,15 +297,28 @@ impl eframe::App for CinterApp {
 	fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
 		egui::CentralPanel::default().show(ctx, |ui| {
 
+			let old_params = self.params.values;
+			let old_length = self.params.length;
+			let old_repeat_start = self.repeat_start();
+
 			ui.horizontal(|ui| {
 				ui.heading("Parameters");
+				if ui.button("Random").clicked() {
+					let mut random = thread_rng();
+					for p in 0..PARAMETER_COUNT {
+						self.params.values[p] = random.gen::<f32>()
+					}
+					self.current_instrument = CinterInstrument::new(
+						self.engine.clone(), &self.params.values, None, None
+					);
+					self.params.length = self.auto_length() as usize;
+					self.params.repeat_length = 0;
+				}
 				ui.with_layout(egui::Layout::right_to_left(), |ui| {
 					egui::widgets::global_dark_light_mode_buttons(ui);
 				});
 			});
 			ui.separator();
-
-			let old_params = self.params.values;
 
 			for p in 0..PARAMETER_COUNT {
 				let param = &mut self.params.values[p];
@@ -415,8 +429,6 @@ impl eframe::App for CinterApp {
 				  .max_decimals(0)
 			}
 
-			let old_length = self.params.length;
-			let old_repeat_start = self.repeat_start();
 			ui.horizontal(|ui| {
 				ui.group(|ui| {
 					let mut length = self.params.length as i32;
