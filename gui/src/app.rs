@@ -34,8 +34,17 @@ pub struct CinterApp {
 
 pub struct CinterParameters {
 	values: [f32; PARAMETER_COUNT],
+	chord: Vec<u8>,
 	length: usize,
 	repeat_length: usize,
+}
+
+fn chord_text(num_tones: usize) -> String {
+	if num_tones > 1 {
+		format!("{num_tones} notes")
+	} else {
+		format!("None")
+	}
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -92,8 +101,9 @@ impl CinterApp {
 		let params = [
 			0.05, 0.40, 0.53, 0.50, 0.65, 0.50, 0.20, 0.40, 0.0, 0.0, 0.1, 0.2
 		];
+		let chord = vec![];
 
-		let mut current_instrument = CinterInstrument::new(Arc::clone(&engine), &params, None, None);
+		let mut current_instrument = CinterInstrument::new(Arc::clone(&engine), &params, &chord, None, None);
 		player.send(PlayerMessage::Instrument { instrument: current_instrument.clone() }).ok();
 		let length = Self::compute_length(&mut current_instrument);
 
@@ -103,6 +113,7 @@ impl CinterApp {
 
 			params: CinterParameters {
 				values: params,
+				chord,
 				length,
 				repeat_length: 0,
 			},
@@ -111,7 +122,7 @@ impl CinterApp {
 			engine,
 			current_instrument,
 			octaves: Octaves::High,
-			volume: 1.0,
+			volume: 0.5,
 
 			error_string: None,
 		}
@@ -216,7 +227,7 @@ impl CinterApp {
 	}
 
 	fn save_sample(&mut self, format: FileFormat) -> std::io::Result<()> {
-		let filename = CinterEngine::get_sample_filename(&self.params.values);
+		let filename = CinterEngine::sample_filename_from_chord_parameters(&self.params.values, &self.params.chord);
 		let mut file = File::create(filename.clone() + format.extension())?;
 		let data: Vec<u8> = (0..self.params.length).map(|i| self.current_instrument.get_sample(i) as u8).collect();
 		match format {
@@ -262,17 +273,19 @@ impl CinterApp {
 				Ok(name) => std::str::from_utf8(name)?,
 				_ => filename,
 			};
-			let param_values = CinterEngine::parameters_from_sample_filename(name)?;
+			let (param_values, chord_intervals) = CinterEngine::chord_parameters_from_sample_filename(name)?;
 			Ok(CinterParameters {
 				values: param_values,
+				chord: chord_intervals,
 				length,
 				repeat_length,
 			})
 		} else {
 			// RAW file
-			let param_values = CinterEngine::parameters_from_sample_filename(filename)?;
+			let (param_values, chord_intervals) = CinterEngine::chord_parameters_from_sample_filename(filename)?;
 			Ok(CinterParameters {
 				values: param_values,
+				chord: chord_intervals,
 				length: data.len(),
 				repeat_length: 0,
 			})
@@ -308,15 +321,18 @@ impl eframe::App for CinterApp {
 		egui::CentralPanel::default().show(ctx, |ui| {
 
 			let old_params = self.params.values;
+			let old_chord = self.params.chord.clone();
 			let old_length = self.params.length;
 			let old_repeat_start = self.repeat_start();
 			let old_auto_length = self.auto_length;
 
 			ui.horizontal(|ui| {
 				ui.heading("Parameters");
-				if ui.button("Random").clicked() {
-					self.set_random_parameters();
-				}
+				ui.add_enabled_ui(self.params.chord.is_empty(), |ui| {
+					if ui.button("Random").clicked() {
+						self.set_random_parameters();
+					}
+				});
 				if ui.button("Random melodic").clicked() {
 					self.set_random_parameters();
 					self.params.values[3] = 0.5;
@@ -332,22 +348,54 @@ impl eframe::App for CinterApp {
 			for p in 0..PARAMETER_COUNT {
 				let param = &mut self.params.values[p];
 				let resolution = CinterEngine::get_parameter_resolution(p as i32);
-				ui.horizontal(|ui| {
-					let (value, label) = CinterEngine::get_parameter_text_and_label(p as i32, *param);
-					ui.spacing_mut().slider_width = 400.0;
-					with_width(ui, 100.0, |ui| {
-						ui.label(CinterEngine::get_parameter_name(p as i32));
+				let enabled = self.params.chord.is_empty() || (p != 3 && p != 5);
+				ui.add_enabled_ui(enabled, |ui| {
+					ui.horizontal(|ui| {
+						let (value, label) = CinterEngine::get_parameter_text_and_label(p as i32, *param);
+						ui.spacing_mut().slider_width = 400.0;
+						with_width(ui, 100.0, |ui| {
+							ui.label(CinterEngine::get_parameter_name(p as i32));
+						});
+						ui.add(egui::Slider::new(param, 0.0..=1.0).show_value(false));
+						if ui.small_button("➖").clicked() {
+							*param = (((*param / resolution).round() - 1.0) * resolution).max(0.0);
+						}
+						if ui.small_button("➕").clicked() {
+							*param = (((*param / resolution).round() + 1.0) * resolution).min(1.0);
+						}
+						ui.label(value + " " + &label);
 					});
-					ui.add(egui::Slider::new(param, 0.0..=1.0).show_value(false));
-					if ui.small_button("➖").clicked() {
-						*param = (((*param / resolution).round() - 1.0) * resolution).max(0.0);
-					}
-					if ui.small_button("➕").clicked() {
-						*param = (((*param / resolution).round() + 1.0) * resolution).min(1.0);
-					}
-					ui.label(value + " " + &label);
 				});
 			}
+
+			ui.separator();
+
+			ui.horizontal(|ui| {
+				let chord = &mut self.params.chord;
+				let mut num_tones = chord.len() + 1;
+				ui.add(egui::Label::new(egui::RichText::new("Chord: ").text_style(egui::TextStyle::Button)));
+				egui::ComboBox::from_label("")
+					.selected_text(chord_text(num_tones))
+					.show_ui(ui, |ui| {
+						for n in 1..=5 {
+							ui.selectable_value(&mut num_tones, n, chord_text(n));
+						}
+					});
+				let new_len = num_tones - 1;
+				if chord.len() > new_len {
+					chord.truncate(new_len);
+				} else {
+					while chord.len() < new_len {
+						chord.push([4, 3, 3, 2][chord.len()]);
+					}
+				}
+				if !chord.is_empty() {
+					ui.add(egui::Label::new(egui::RichText::new("Intervals: ").text_style(egui::TextStyle::Button)));
+					for interval in chord.iter_mut() {
+						ui.add(egui::DragValue::new(interval).clamp_range(1..=12).speed(0.02));
+					}
+				}
+			});
 
 			ui.separator();
 
@@ -364,7 +412,7 @@ impl eframe::App for CinterApp {
 						Err(err) => self.error_string = Some(format!("{}", err)),
 					}
 				}
-				ui.add(egui::Label::new(CinterEngine::get_sample_filename(&self.params.values)));
+				ui.add(egui::Label::new(CinterEngine::sample_filename_from_chord_parameters(&self.params.values, &self.params.chord)));
 				if let Some(err) = &self.error_string {
 					ui.add(egui::Label::new(egui::RichText::new(err).color(egui::Color32::RED)));
 				}
@@ -477,7 +525,7 @@ impl eframe::App for CinterApp {
 				ui.group(|ui| {
 					ui.add(egui::Label::new(egui::RichText::new("Volume: ").text_style(egui::TextStyle::Button)));
 					let volume = self.volume;
-					ui.add(egui::widgets::DragValue::new(&mut self.volume).speed(0.01).clamp_range(0.0 ..= 5.0));
+					ui.add(egui::widgets::DragValue::new(&mut self.volume).speed(0.01).clamp_range(0.0 ..= 1.0));
 					if self.volume != volume {
 						self.player.send(PlayerMessage::SetVolume { volume: self.volume }).ok();
 					}
@@ -495,7 +543,7 @@ impl eframe::App for CinterApp {
 							self.error_string = None;
 							self.params = params;
 							self.current_instrument = CinterInstrument::new(
-								self.engine.clone(), &self.params.values, None, None
+								self.engine.clone(), &self.params.values, &self.params.chord, None, None
 							);
 							self.auto_length = self.params.length == Self::compute_length(&mut self.current_instrument);
 						},
@@ -509,10 +557,11 @@ impl eframe::App for CinterApp {
 			if self.params.length != old_length ||
 					self.repeat_start() != old_repeat_start ||
 					self.params.values != old_params ||
+					self.params.chord != old_chord ||
 					self.auto_length != old_auto_length {
 				self.error_string = None;
 				self.current_instrument = CinterInstrument::new(
-					self.engine.clone(), &self.params.values, Some(self.params.length), self.repeat_start()
+					self.engine.clone(), &self.params.values, &self.params.chord, Some(self.params.length), self.repeat_start()
 				);
 				if self.auto_length {
 					self.params.length = Self::compute_length(&mut self.current_instrument);

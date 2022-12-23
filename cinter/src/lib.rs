@@ -145,7 +145,7 @@ impl Default for CinterPlugin {
 		};
 		let engine = Arc::new(CinterEngine::new());
 		let instrument = Arc::new(RwLock::new(CinterInstrument::new(
-			engine.clone(), &params.values, None, None
+			engine.clone(), &params.values, &[], None, None
 		)));
 
 		CinterPlugin {
@@ -299,14 +299,14 @@ impl CinterPlugin {
 				let mut params = self.param_object.params.write().unwrap();
 				if params.changed {
 					self.instrument = Arc::new(RwLock::new(CinterInstrument::new(
-						self.engine.clone(), &params.values, None, None
+						self.engine.clone(), &params.values, &[], None, None
 					)));
 					params.changed = false;
 				}
 				self.notes.push(Note::new(self.instrument.clone(), key, velocity, self.sample_rate));
 
 				if key == 52 {
-					write_filename = Some(CinterEngine::get_sample_filename(&params.values));
+					write_filename = Some(CinterEngine::sample_filename_from_parameters(&params.values));
 				}
 			},
 			MidiCommand::NoteOff { key, velocity, .. } => {

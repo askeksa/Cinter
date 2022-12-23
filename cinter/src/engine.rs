@@ -10,6 +10,16 @@ pub struct CinterEngine {
 
 #[derive(Clone)]
 pub struct CinterInstrument {
+	layers: Vec<CinterInstrumentLayer>,
+
+	pub length: usize,
+	pub repeat_start: Option<usize>,
+
+	data: Vec<i8>,
+}
+
+#[derive(Clone)]
+struct CinterInstrumentLayer {
 	engine: Arc<CinterEngine>,
 
 	attack: i32,
@@ -25,16 +35,10 @@ pub struct CinterInstrument {
 	vpower: i32,
 	fdist: i32,
 
-	pub length: usize,
-	pub repeat_start: Option<usize>,
-
 	phase: i32,
 	amp: i32,
 	amp_delta: i32,
-
-	data: Vec<i8>,
 }
-
 
 impl CinterEngine {
 	pub fn new() -> Self {
@@ -94,7 +98,7 @@ impl CinterEngine {
 		if index < 8 { 0.01 } else { 0.1 }
 	}
 
-	pub fn get_sample_filename(params: &[f32; PARAMETER_COUNT]) -> String {
+	pub fn sample_filename_from_parameters(params: &[f32; PARAMETER_COUNT]) -> String {
 		let mut name = "1".to_string();
 		for i in 0..PARAMETER_COUNT {
 			let repr = if i < 8 {
@@ -119,19 +123,46 @@ impl CinterEngine {
 		name
 	}
 
+	pub fn sample_filename_from_chord_parameters(params: &[f32; PARAMETER_COUNT], chord_intervals: &[u8]) -> String {
+		let basename = Self::sample_filename_from_parameters(params);
+		if !chord_intervals.is_empty() {
+			let s = |i: usize| {
+				if i < chord_intervals.len() {
+					match chord_intervals[i] {
+						12 => "B".to_string(),
+						11 => "A".to_string(),
+						int => (int - 1).to_string(),
+					}
+				} else {
+					"-".to_string()
+				}
+			};
+			let mut name = (chord_intervals.len() + 1).to_string();
+			name += &basename[1..7];
+			name += &s(0);
+			name += &s(1);
+			name += &basename[9..11];
+			name += &s(2);
+			name += &s(3);
+			name += &basename[13..];
+			return name;
+		}
+		basename
+	}
+
 	pub fn parameters_from_sample_filename(name: &str) -> anyhow::Result<[f32; PARAMETER_COUNT]> {
 		let legacy = !name.starts_with('1');
 		let mut params = [0f32; PARAMETER_COUNT];
 		for i in 0..PARAMETER_COUNT {
 			if i < 8 {
-				let digits: &str = name.get(i * 2 + 1 .. i * 2 + 3).ok_or(anyhow::anyhow!("Name too short"))?;
+				let digits: &str = name.get(i * 2 + 1 .. i * 2 + 3).ok_or_else(|| anyhow::anyhow!("Name too short"))?;
 				params[i] = if digits.eq_ignore_ascii_case("XX") {
 					100
 				} else {
 					digits.parse::<i32>()?
 				} as f32 * 0.01;
 			} else {
-				let digit = name.get(i + 9 .. i + 10).ok_or(anyhow::anyhow!("Name too short"))?;
+				let digit = name.get(i + 9 .. i + 10).ok_or_else(|| anyhow::anyhow!("Name too short"))?;
 				params[i] = if digit.eq_ignore_ascii_case("X") {
 					10
 				} else {
@@ -168,12 +199,45 @@ impl CinterEngine {
 
 		Ok(params)
 	}
+
+	pub fn chord_parameters_from_sample_filename(name: &str) -> anyhow::Result<([f32; PARAMETER_COUNT], Vec<u8>)> {
+		let chord_marker = name.get(0 .. 1).ok_or_else(|| anyhow::anyhow!("Name too short"))?;
+		match chord_marker {
+			"2" | "3" | "4" | "5" => {
+				let num_tones = chord_marker.parse::<usize>().unwrap();
+				let mut chord = vec![];
+				for interval_index in 1..num_tones {
+					let index = [7, 8, 11, 12][interval_index - 1];
+					let char = name.get(index .. index + 1).ok_or_else(|| anyhow::anyhow!("Name too short"))?;
+					let interval = if char.eq_ignore_ascii_case("B") {
+						12
+					} else if char.eq_ignore_ascii_case("A") {
+						11
+					} else {
+						char.parse::<u8>()? + 1
+					};
+					chord.push(interval);
+				}
+				let mut basename = "1".to_string();
+				basename += name.get(1..7).ok_or_else(|| anyhow::anyhow!("Name too short"))?;
+				basename += "50";
+				basename += &name.get(9..11).ok_or_else(|| anyhow::anyhow!("Name too short"))?;
+				basename += "50";
+				basename += &name.get(13..).ok_or_else(|| anyhow::anyhow!("Name too short"))?;
+				Ok((Self::parameters_from_sample_filename(&basename)?, chord))
+			},
+			_ => {
+				Ok((Self::parameters_from_sample_filename(name)?, vec![]))
+			}
+		}
+	}
 }
 
 impl CinterInstrument {
 	pub fn new(
 		engine: Arc<CinterEngine>,
 		params: &[f32; PARAMETER_COUNT],
+		chord_intervals: &[u8],
 		length: Option<usize>,
 		repeat_start: Option<usize>,
 	) -> Self {
@@ -183,35 +247,32 @@ impl CinterInstrument {
 			_ => repeat_start
 		};
 
-		let mut inst = CinterInstrument {
-			engine,
+		let mut params = params.clone();
+		if !chord_intervals.is_empty() {
+			params[3] = 0.5;
+			params[5] = 0.5;
+		}
+		let mut layers = vec![CinterInstrumentLayer::new(Arc::clone(&engine), &params)];
+		for &interval in chord_intervals {
+			for pitch_index in [2, 4] {
+				if p100(params[pitch_index]) != 0 {
+					params[pitch_index] += interval as f32 * 0.01;
+				}
+			}
+			layers.push(CinterInstrumentLayer::new(Arc::clone(&engine), &params));
+		}
 
-			attack:      envfun(params[0]),
-			decay:       envfun(params[1]),
-			mpitch:      pitchfun(params[2]) << 16,
-			mpitchdecay: decayfun(params[3]),
-			bpitch:      pitchfun(params[4]) << 16,
-			bpitchdecay: decayfun(params[5]),
-			mod_:        (p100(params[6]) << 16) as u32,
-			moddecay:    decayfun(params[7]),
-			mdist:       p10(params[8]),
-			bdist:       p10(params[9]),
-			vpower:      p10(params[10]),
-			fdist:       p10(params[11]),
+		let mut inst = CinterInstrument {
+			layers,
 
 			length,
 			repeat_start,
-
-			phase:       0,
-			amp:         0,
-			amp_delta:   0,
 
 			data:        Vec::with_capacity(length),
 		};
 
 		inst.data.push(0);
 		inst.data.push(0);
-		inst.amp_delta = inst.attack;
 
 		inst
 	}
@@ -240,6 +301,42 @@ impl CinterInstrument {
 			self.data.push(sample);
 		}
 		self.data[index]
+	}
+
+	fn compute_sample(&mut self) -> i8 {
+		let mut sum = 0i16;
+		for layer in &mut self.layers {
+			sum += layer.compute_sample() as i16;
+		}
+		(sum / self.layers.len() as i16) as i8
+	}
+}
+
+impl CinterInstrumentLayer {
+	fn new(engine: Arc<CinterEngine>, params: &[f32; PARAMETER_COUNT]) -> Self {
+		let mut layer = CinterInstrumentLayer {
+			engine,
+
+			attack:      envfun(params[0]),
+			decay:       envfun(params[1]),
+			mpitch:      pitchfun(params[2]) << 16,
+			mpitchdecay: decayfun(params[3]),
+			bpitch:      pitchfun(params[4]) << 16,
+			bpitchdecay: decayfun(params[5]),
+			mod_:        (p100(params[6]) << 16) as u32,
+			moddecay:    decayfun(params[7]),
+			mdist:       p10(params[8]),
+			bdist:       p10(params[9]),
+			vpower:      p10(params[10]),
+			fdist:       p10(params[11]),
+
+			phase:       0,
+			amp:         0,
+			amp_delta:   0,
+		};
+		layer.amp_delta = layer.attack;
+
+		layer
 	}
 
 	fn compute_sample(&mut self) -> i8 {
