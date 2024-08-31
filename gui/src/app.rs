@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::prelude::*;
 use std::ops::RangeInclusive;
+use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{sync_channel, SyncSender};
 use std::sync::{Arc, RwLock};
@@ -249,9 +250,10 @@ impl CinterApp {
 		}
 	}
 
-	fn load_sample(&mut self, filename: &str) -> anyhow::Result<CinterParameters> {
+	fn load_sample(&mut self, path: &impl AsRef<Path>) -> anyhow::Result<CinterParameters> {
+		let filename = path.as_ref().file_name().ok_or(anyhow::anyhow!("Not a file"))?.to_str().ok_or(anyhow::anyhow!("Invalid filename"))?;
 		let mut data = vec![];
-		File::open(filename)?.read_to_end(&mut data)?;
+		File::open(path)?.read_to_end(&mut data)?;
 		if let Ok([b'8', b'S', b'V', b'X', chunks @ ..]) = IffReader::find_chunk(&data, "FORM") {
 			// 8SVX file
 			let header = IffReader::find_chunk(chunks, "VHDR")?;
@@ -489,7 +491,7 @@ impl eframe::App for CinterApp {
 			});
 
 			for file in &ctx.input().raw.dropped_files {
-				if let Some(name) = file.path.as_ref().and_then(|f| f.file_name()).and_then(|n| n.to_str()) {
+				if let Some(name) = file.path.as_ref() {
 					match self.load_sample(name) {
 						Ok(params) => {
 							self.error_string = None;
