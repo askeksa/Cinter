@@ -307,6 +307,7 @@ fn with_width(ui: &mut egui::Ui, width: f32, add_contents: impl FnOnce(&mut egui
 
 impl eframe::App for CinterApp {
 	fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+		let mut force_repaint = false;
 		egui::CentralPanel::default().show(ctx, |ui| {
 
 			let old_params = self.params.values;
@@ -500,6 +501,7 @@ impl eframe::App for CinterApp {
 								self.engine.clone(), &self.params.values, None, None
 							);
 							self.auto_length = self.params.length == Self::compute_length(&mut self.current_instrument);
+							force_repaint = true;
 						},
 						Err(err) => {
 							self.error_string = Some(format!("{}", err));
@@ -543,7 +545,7 @@ impl eframe::App for CinterApp {
 			}
 		});
 
-		if !self.cursors.is_empty() {
+		if !self.cursors.is_empty() || force_repaint {
 			ctx.request_repaint();
 		}
 	}
