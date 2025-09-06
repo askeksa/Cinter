@@ -8,7 +8,7 @@ use std::sync::{Arc, RwLock};
 
 use eframe::egui;
 use egui::{Event, Key};
-use rand::{thread_rng, Rng};
+use rand::{rng, Rng};
 
 use cpal::traits::{DeviceTrait, HostTrait, EventLoopTrait};
 
@@ -282,9 +282,9 @@ impl CinterApp {
 	}
 
 	fn set_random_parameters(&mut self) {
-		let mut random = thread_rng();
+		let mut random = rng();
 		for p in 0..PARAMETER_COUNT {
-			self.params.values[p] = random.gen::<f32>()
+			self.params.values[p] = random.random::<f32>()
 		}
 		self.params.repeat_length = 0;
 	}
