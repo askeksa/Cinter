@@ -16,7 +16,7 @@ use cinter::engine::{CinterEngine, CinterInstrument, PARAMETER_COUNT};
 
 use crate::iff::{IffReader, IffWriter};
 
-pub const TITLE: &'static str = "Cinter 4.1.1 by Blueberry";
+pub const TITLE: &'static str = "Cinter 4.1.2 by Blueberry";
 
 pub struct CinterApp {
 	player: SyncSender<PlayerMessage>,
@@ -83,11 +83,7 @@ fn translate_key(key: Key) -> Option<u8> {
 }
 
 impl CinterApp {
-	pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-		if cc.integration_info.prefer_dark_mode.is_none() {
-			cc.egui_ctx.set_visuals(egui::Visuals::dark());
-		}
-
+	pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
 		let player = Self::start_player();
 		let engine = Arc::new(CinterEngine::new());
 		let params = [
@@ -326,8 +322,8 @@ impl eframe::App for CinterApp {
 					self.params.values[5] = 0.5;
 					self.params.values[7] *= 0.5;
 				}
-				ui.with_layout(egui::Layout::right_to_left(), |ui| {
-					egui::widgets::global_dark_light_mode_buttons(ui);
+				ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+					egui::widgets::global_theme_preference_buttons(ui);
 				});
 			});
 			ui.separator();
@@ -396,7 +392,7 @@ impl eframe::App for CinterApp {
 				if let Some(prev_pos) = prev_pos {
 					lines.push(egui::Shape::LineSegment {
 						points: [prev_pos, pos],
-						stroke: egui::Stroke { width: 0.8, color: plot_col },
+						stroke: egui::Stroke { width: 0.8, color: plot_col }.into(),
 					});
 				}
 				prev_pos = Some(pos);
@@ -410,7 +406,7 @@ impl eframe::App for CinterApp {
 				];
 				let line = egui::Shape::LineSegment {
 					points,
-					stroke: egui::Stroke { width: 0.8, color },
+					stroke: egui::Stroke { width: 0.8, color }.into(),
 				};
 				lines.push(line);
 			};
@@ -435,7 +431,7 @@ impl eframe::App for CinterApp {
 						*value = ((v as i32) + 16) & -32;
 					}
 					*value as f64
-				}).clamp_range(range.start().to_f64() ..= range.end().to_f64())
+				}).range(range)
 				  .speed(10.0)
 				  .min_decimals(0)
 				  .max_decimals(0)
@@ -480,7 +476,7 @@ impl eframe::App for CinterApp {
 				ui.group(|ui| {
 					ui.add(egui::Label::new(egui::RichText::new("Volume: ").text_style(egui::TextStyle::Button)));
 					let volume = self.volume;
-					ui.add(egui::widgets::DragValue::new(&mut self.volume).speed(0.01).clamp_range(0.0 ..= 5.0));
+					ui.add(egui::widgets::DragValue::new(&mut self.volume).speed(0.01).range(0.0 ..= 5.0));
 					if self.volume != volume {
 						self.player.send(PlayerMessage::SetVolume { volume: self.volume }).ok();
 					}
@@ -491,7 +487,7 @@ impl eframe::App for CinterApp {
 				egui::warn_if_debug_build(ui);
 			});
 
-			for file in &ctx.input().raw.dropped_files {
+			for file in ctx.input(|i| i.raw.dropped_files.clone()) {
 				if let Some(name) = file.path.as_ref() {
 					match self.load_sample(name) {
 						Ok(params) => {
@@ -525,15 +521,15 @@ impl eframe::App for CinterApp {
 				self.player.send(PlayerMessage::Instrument { instrument: self.current_instrument.clone() }).ok();
 			}
 
-			for event in &ui.input().events {
+			for event in ui.input(|i| i.events.clone()) {
 				if let Event::Key { key, pressed, .. } = event {
-					if let Some(mut key) = translate_key(*key) {
+					if let Some(mut key) = translate_key(key) {
 						key += match self.octaves {
 							Octaves::Low => 12,
 							Octaves::High => 24,
 						};
 						if key >= 12 && key < 48 {
-							if *pressed {
+							if pressed {
 								let cursor = self.new_cursor();
 								self.player.send(PlayerMessage::NoteOn { key, cursor }).ok();
 							} else {
