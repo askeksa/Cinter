@@ -11,6 +11,7 @@ use egui::{Event, Key};
 use rand::{rng, Rng};
 
 use cpal::traits::{DeviceTrait, HostTrait, EventLoopTrait};
+use rfd::FileDialog;
 
 use cinter::engine::{CinterEngine, CinterInstrument, PARAMETER_COUNT, FILENAME_LENGTH};
 
@@ -212,9 +213,9 @@ impl CinterApp {
 		sender
 	}
 
-	fn save_sample(&mut self, format: FileFormat) -> std::io::Result<()> {
+	fn save_sample(&mut self, path: &impl AsRef<Path>, format: FileFormat) -> std::io::Result<()> {
 		let filename = CinterEngine::get_sample_filename(&self.params.values);
-		let mut file = File::create(filename.clone() + format.extension())?;
+		let mut file = File::create(path.as_ref().join(filename.clone() + format.extension()))?;
 		let data: Vec<u8> = (0..self.params.length).map(|i| self.current_instrument.get_sample(i) as u8).collect();
 		match format {
 			FileFormat::Raw => file.write_all(&data),
@@ -246,6 +247,13 @@ impl CinterApp {
 		}
 	}
 
+	fn do_save_sample(&mut self, path: &impl AsRef<Path>, format: FileFormat) {
+		match self.save_sample(path, format) {
+			Ok(..) => self.error_string = None,
+			Err(err) => self.error_string = Some(format!("{}", err)),
+		}
+	}
+
 	fn load_sample(&mut self, path: &impl AsRef<Path>) -> anyhow::Result<CinterParameters> {
 		let filename = path.as_ref().file_name().ok_or(anyhow::anyhow!("Not a file"))?.to_str().ok_or(anyhow::anyhow!("Invalid filename"))?;
 		let mut data = vec![];
@@ -274,6 +282,23 @@ impl CinterApp {
 				length: data.len(),
 				repeat_length: 0,
 			})
+		}
+	}
+
+	fn do_load_sample(&mut self, path: &impl AsRef<Path>, force_repaint: &mut bool) {
+		match self.load_sample(path) {
+			Ok(params) => {
+				self.error_string = None;
+				self.params = params;
+				self.current_instrument = CinterInstrument::new(
+					self.engine.clone(), &self.params.values, None, None
+				);
+				self.auto_length = self.params.length == Self::compute_length(&mut self.current_instrument);
+				*force_repaint = true;
+			},
+			Err(err) => {
+				self.error_string = Some(format!("{}", err));
+			},
 		}
 	}
 
@@ -352,17 +377,20 @@ impl eframe::App for CinterApp {
 			ui.separator();
 
 			ui.horizontal(|ui| {
-				if ui.button("Save as RAW").clicked() {
-					match self.save_sample(FileFormat::Raw) {
-						Ok(..) => self.error_string = None,
-						Err(err) => self.error_string = Some(format!("{}", err)),
+				if ui.button("Load").clicked() {
+				    if let Some(path) = FileDialog::new().set_title("Load sample").pick_file() {
+						self.do_load_sample(&path, &mut force_repaint);
 					}
 				}
+				if ui.button("Save as RAW").clicked() {
+                    if let Some(path) = FileDialog::new().set_title("Save sample as RAW").pick_folder() {
+                        self.do_save_sample(&path, FileFormat::Raw);
+                    }
+				}
 				if ui.button("Save as 8SVX").clicked() {
-					match self.save_sample(FileFormat::Iff) {
-						Ok(..) => self.error_string = None,
-						Err(err) => self.error_string = Some(format!("{}", err)),
-					}
+				    if let Some(path) = FileDialog::new().set_title("Save sample as 8SVX").pick_folder() {
+                        self.do_save_sample(&path, FileFormat::Iff);
+                    }
 				}
 				let mut filename = CinterEngine::get_sample_filename(&self.params.values);
 				let edit = egui::TextEdit::singleline(&mut filename).desired_width(150.0).show(ui);
@@ -508,20 +536,7 @@ impl eframe::App for CinterApp {
 
 			for file in ctx.input(|i| i.raw.dropped_files.clone()) {
 				if let Some(name) = file.path.as_ref() {
-					match self.load_sample(name) {
-						Ok(params) => {
-							self.error_string = None;
-							self.params = params;
-							self.current_instrument = CinterInstrument::new(
-								self.engine.clone(), &self.params.values, None, None
-							);
-							self.auto_length = self.params.length == Self::compute_length(&mut self.current_instrument);
-							force_repaint = true;
-						},
-						Err(err) => {
-							self.error_string = Some(format!("{}", err));
-						},
-					}
+					self.do_load_sample(name, &mut force_repaint);
 				}
 			}
 
