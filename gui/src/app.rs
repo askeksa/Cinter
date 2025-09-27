@@ -6,13 +6,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{sync_channel, SyncSender};
 use std::sync::{Arc, RwLock};
 
-use eframe::egui;
+use eframe::egui::{self, TextBuffer};
 use egui::{Event, Key};
 use rand::{rng, Rng};
 
 use cpal::traits::{DeviceTrait, HostTrait, EventLoopTrait};
 
-use cinter::engine::{CinterEngine, CinterInstrument, PARAMETER_COUNT};
+use cinter::engine::{CinterEngine, CinterInstrument, PARAMETER_COUNT, FILENAME_LENGTH};
 
 use crate::iff::{IffReader, IffWriter};
 
@@ -310,6 +310,7 @@ impl eframe::App for CinterApp {
 			let old_length = self.params.length;
 			let old_repeat_start = self.repeat_start();
 			let old_auto_length = self.auto_length;
+			let mut editing_name = false;
 
 			ui.horizontal(|ui| {
 				ui.heading("Parameters");
@@ -363,7 +364,25 @@ impl eframe::App for CinterApp {
 						Err(err) => self.error_string = Some(format!("{}", err)),
 					}
 				}
-				ui.add(egui::Label::new(CinterEngine::get_sample_filename(&self.params.values)));
+				let mut filename = CinterEngine::get_sample_filename(&self.params.values);
+				let edit = egui::TextEdit::singleline(&mut filename).desired_width(150.0).show(ui);
+				if edit.response.changed() {
+				    if filename.len() > FILENAME_LENGTH {
+						if let Some(cursor_range) = edit.cursor_range {
+							let start = cursor_range.primary.index;
+							let end = start + (filename.len() - FILENAME_LENGTH);
+							let start = filename.byte_index_from_char_index(start);
+							let end = filename.byte_index_from_char_index(end);
+							filename.replace_range(start..end, "");
+						}
+				    }
+					if let Ok(new_params) = CinterEngine::parameters_from_sample_filename(&filename) {
+						self.params.values = new_params;
+					}
+				}
+				if edit.response.has_focus() {
+					editing_name = true;
+				}
 				if let Some(err) = &self.error_string {
 					ui.add(egui::Label::new(egui::RichText::new(err).color(egui::Color32::RED)));
 				}
@@ -521,7 +540,7 @@ impl eframe::App for CinterApp {
 				self.player.send(PlayerMessage::Instrument { instrument: self.current_instrument.clone() }).ok();
 			}
 
-			for event in ui.input(|i| i.events.clone()) {
+			let mut handle_key_event = |event: Event| {
 				if let Event::Key { key, pressed, .. } = event {
 					if let Some(mut key) = translate_key(key) {
 						key += match self.octaves {
@@ -537,6 +556,11 @@ impl eframe::App for CinterApp {
 							}
 						}
 					}
+				}
+			};
+			if !editing_name {
+				for event in ui.input(|i| i.events.clone()) {
+					handle_key_event(event);
 				}
 			}
 		});

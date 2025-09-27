@@ -3,6 +3,7 @@ use std::f32::consts::PI;
 use std::sync::Arc;
 
 pub const PARAMETER_COUNT: usize = 12;
+pub const FILENAME_LENGTH: usize = 21;
 
 pub struct CinterEngine {
 	sine_table: Vec<i16>,
@@ -125,8 +126,12 @@ impl CinterEngine {
 		for i in 0..PARAMETER_COUNT {
 			if i < 8 {
 				let digits: &str = name.get(i * 2 + 1 .. i * 2 + 3).ok_or(anyhow::anyhow!("Name too short"))?;
-				params[i] = if digits.eq_ignore_ascii_case("XX") {
+				let digit1 = digits.get(0..1).unwrap();
+				let digit2 = digits.get(1..2).unwrap();
+				params[i] = if digit1.eq_ignore_ascii_case("X") {
 					100
+				} else if digit2.eq_ignore_ascii_case("X") {
+					digit1.parse::<i32>()? * 10
 				} else {
 					digits.parse::<i32>()?
 				} as f32 * 0.01;
