@@ -338,45 +338,6 @@ impl eframe::App for CinterApp {
 			let mut editing_name = false;
 
 			ui.horizontal(|ui| {
-				ui.heading("Parameters");
-				if ui.button("Random").clicked() {
-					self.set_random_parameters();
-				}
-				if ui.button("Random melodic").clicked() {
-					self.set_random_parameters();
-					self.params.values[3] = 0.5;
-					self.params.values[5] = 0.5;
-					self.params.values[7] *= 0.5;
-				}
-				ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-					egui::widgets::global_theme_preference_buttons(ui);
-				});
-			});
-			ui.separator();
-
-			for p in 0..PARAMETER_COUNT {
-				let param = &mut self.params.values[p];
-				let resolution = CinterEngine::get_parameter_resolution(p as i32);
-				ui.horizontal(|ui| {
-					let (value, label) = CinterEngine::get_parameter_text_and_label(p as i32, *param);
-					ui.spacing_mut().slider_width = 400.0;
-					with_width(ui, 100.0, |ui| {
-						ui.label(CinterEngine::get_parameter_name(p as i32));
-					});
-					ui.add(egui::Slider::new(param, 0.0..=1.0).show_value(false));
-					if ui.small_button("➖").clicked() {
-						*param = (((*param / resolution).round() - 1.0) * resolution).max(0.0);
-					}
-					if ui.small_button("➕").clicked() {
-						*param = (((*param / resolution).round() + 1.0) * resolution).min(1.0);
-					}
-					ui.label(value + " " + &label);
-				});
-			}
-
-			ui.separator();
-
-			ui.horizontal(|ui| {
 				if ui.button("Load").clicked() {
 				    if let Some(path) = FileDialog::new().set_title("Load sample").pick_file() {
 						self.do_load_sample(&path, &mut force_repaint);
@@ -414,7 +375,47 @@ impl eframe::App for CinterApp {
 				if let Some(err) = &self.error_string {
 					ui.add(egui::Label::new(egui::RichText::new(err).color(egui::Color32::RED)));
 				}
+
+				ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+					egui::widgets::global_theme_preference_buttons(ui);
+				});
 			});
+
+			ui.separator();
+
+			ui.horizontal(|ui| {
+				ui.heading("Parameters");
+				if ui.button("Random").clicked() {
+					self.set_random_parameters();
+				}
+				if ui.button("Random melodic").clicked() {
+					self.set_random_parameters();
+					self.params.values[3] = 0.5;
+					self.params.values[5] = 0.5;
+					self.params.values[7] *= 0.5;
+				}
+			});
+			ui.separator();
+
+			for p in 0..PARAMETER_COUNT {
+				let param = &mut self.params.values[p];
+				let resolution = CinterEngine::get_parameter_resolution(p as i32);
+				ui.horizontal(|ui| {
+					let (value, label) = CinterEngine::get_parameter_text_and_label(p as i32, *param);
+					ui.spacing_mut().slider_width = 400.0;
+					with_width(ui, 100.0, |ui| {
+						ui.label(CinterEngine::get_parameter_name(p as i32));
+					});
+					ui.add(egui::Slider::new(param, 0.0..=1.0).show_value(false));
+					if ui.small_button("➖").clicked() {
+						*param = (((*param / resolution).round() - 1.0) * resolution).max(0.0);
+					}
+					if ui.small_button("➕").clicked() {
+						*param = (((*param / resolution).round() + 1.0) * resolution).min(1.0);
+					}
+					ui.label(value + " " + &label);
+				});
+			}
 
 			ui.separator();
 
