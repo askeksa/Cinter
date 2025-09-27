@@ -17,7 +17,7 @@ use cinter::engine::{CinterEngine, CinterInstrument, PARAMETER_COUNT, FILENAME_L
 
 use crate::iff::{IffReader, IffWriter};
 
-pub const TITLE: &'static str = "Cinter 4.1.2 by Blueberry";
+pub const TITLE: &'static str = "Cinter 4.2.0 by Blueberry";
 
 pub struct CinterApp {
 	player: SyncSender<PlayerMessage>,
