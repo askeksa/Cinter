@@ -68,9 +68,9 @@ end of the (possibly shortened) sample.
 Support for effect commands are as follows:
 0     (arpeggio)      Supported as long as the base pitch matches a pure note.
 1,2,3 (portamento)    Supported, but only for slide values 00-3F and C0-FF.
-4,6   (vibrato)       Not supported
+4,6   (vibrato)       Supported
 5,A   (volume slide)  Supported*
-7     (tremolo)       Not supported
+7     (tremolo)       Supported
 9     (sampleoffset)  Supported
 B     (positionjump)  Supported
 C     (volume)        Supported*
