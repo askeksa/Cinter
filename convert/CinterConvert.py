@@ -537,9 +537,8 @@ for i in range(1, last_nonempty_inst + 1):
 		while length > max_offset and inst.samples[(length-1)*2:length*2] == "\0\0":
 			length -= 1
 	else:
-		replen = inst.replen
-		if inst.repoffset != inst.length - inst.replen:
-			msg = "Repeat is not at end!"
+		length = min(length, inst.repoffset + inst.replen)
+		replen = length - inst.repoffset
 	total_inst_size += length
 	inst.length = length
 
