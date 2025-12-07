@@ -474,7 +474,7 @@ for track in range(4):
 					dper = (per - pper) & 511
 				if ((dper >> 7) ^ (dper >> 6)) & 1 == 1:
 					error("Unsupported slide value", pat, track, row)
-					dper = 63
+					dper = 512-64 if per < pper else 63
 				data = (dper << NOTE_SHIFT) | (dvol << VOLUME_SHIFT)
 				pdper = dper
 		track_data[track].append(data)
