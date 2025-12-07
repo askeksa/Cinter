@@ -110,6 +110,14 @@ period = [0,0,0,0]
 volume = [0,0,0,0]
 portamento_target = [0,0,0,0]
 portamento_speed = [0,0,0,0]
+vibrato_speed = [0,0,0,0]
+vibrato_depth = [0,0,0,0]
+vibrato_phase = [0,0,0,0]
+vibrato_ongoing = [False, False, False, False]
+tremolo_speed = [0,0,0,0]
+tremolo_depth = [0,0,0,0]
+tremolo_phase = [0,0,0,0]
+tremolo_ongoing = [False, False, False, False]
 offset_value = [0,0,0,0]
 
 states = dict()
@@ -118,6 +126,13 @@ periodtable = [
 	856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,
 	428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
 	214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113
+]
+
+vibratotable = [
+	0,  24,  49,  74,  97, 120, 141, 161,
+	180, 197, 212, 224, 235, 244, 250, 253,
+	255, 253, 250, 244, 235, 224, 212, 197,
+	180, 161, 141, 120,  97,  74,  49,  24
 ]
 
 startrow = 0
@@ -136,7 +151,11 @@ while not stopped and not looped:
 			# Skip first row after patterndelay + patternbreak
 			skip = False
 			continue
-		state = (pos,r,musicspeed,tuple(inst),tuple(period),tuple(volume),tuple(portamento_target),tuple(portamento_speed),tuple(offset_value))
+		state = (pos,r,musicspeed,tuple(inst),tuple(period),tuple(volume),
+			tuple(portamento_target),tuple(portamento_speed),
+			tuple(vibrato_speed),tuple(vibrato_depth),tuple(vibrato_phase),tuple(vibrato_ongoing),
+			tuple(tremolo_speed),tuple(tremolo_depth),tuple(tremolo_phase),tuple(tremolo_ongoing),
+			tuple(offset_value))
 		if state in states:
 			restart = states[state]
 			looped = True
@@ -146,7 +165,7 @@ while not stopped and not looped:
 
 		# Check for unsupported commands
 		for t, tr, cmd, arg1, arg2 in row:
-			if cmd in [0x4, 0x6, 0x7, 0xE0, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7, 0xEF]:
+			if cmd in [0xE0, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7, 0xEF]:
 				error("Unsupported command %X" % cmd, p, t, r)
 
 		# Pick up speed and break
@@ -184,6 +203,11 @@ while not stopped and not looped:
 			restart = vblank + 1
 
 		for t, tr, cmd, arg1, arg2 in row:
+			# Vibrato/tremolo phase reset
+			if tr.note is not None and cmd not in [0x3, 0x5]:
+				vibrato_phase[t] = 0
+				tremolo_phase[t] = 0
+
 			# Volume data
 			if tr.inst != 0:
 				volume[t] = module.instruments[tr.inst].volume
@@ -194,7 +218,7 @@ while not stopped and not looped:
 				# Notecut
 				volumedata[t] += [volume[t]] * arg2 + [0] * (speed - arg2)
 				volume[t] = 0
-			elif cmd in [0x5, 0xA]:
+			elif cmd in [0x5, 0x6, 0xA]:
 				# Volumeslide
 				if arg1:
 					slide = arg1
@@ -202,6 +226,22 @@ while not stopped and not looped:
 					slide = -arg2
 				volumedata[t] += [max(0, min(volume[t] + i * slide, 64)) for i in range(speed)]
 				volume[t] = volumedata[t][-1]
+			elif cmd == 0x7:
+				# Tremolo
+				if arg1 != 0:
+					tremolo_speed[t] = arg1
+				if arg2 != 0:
+					tremolo_depth[t] = arg2
+				for i in range(speed):
+					amount = (vibratotable[tremolo_phase[t] & 0x1F] * tremolo_depth[t]) >> 6
+					if tremolo_phase[t] & 0x20:
+						amount = -amount
+					if i > 0:
+						tremolo_phase[t] += tremolo_speed[t]
+						tremolo_phase[t] &= 0x3F
+					elif not tremolo_ongoing[t]:
+						amount = 0
+					volumedata[t] += [max(0, min(volume[t] + amount, 64))]
 			else:
 				if cmd == 0xEA:
 					# Finevolume up
@@ -301,6 +341,23 @@ while not stopped and not looped:
 					else:
 						period[t] = max(period[t] - portamento_speed[t], portamento_target[t])
 					perioddata[t] += [period[t]]
+			elif cmd in [0x4, 0x6]:
+				# Vibrato
+				if cmd == 0x4:
+					if arg1 != 0:
+						vibrato_speed[t] = arg1
+					if arg2 != 0:
+						vibrato_depth[t] = arg2
+				for i in range(speed):
+					amount = (vibratotable[vibrato_phase[t] & 0x1F] * vibrato_depth[t]) >> 7
+					if vibrato_phase[t] & 0x20:
+						amount = -amount
+					if i > 0:
+						vibrato_phase[t] += vibrato_speed[t]
+						vibrato_phase[t] &= 0x3F
+					elif not vibrato_ongoing[t]:
+						amount = 0
+					perioddata[t] += [period[t] + amount]
 			elif tr.note is not None and cmd == 0xED:
 				# Notedelay
 				if arg2 < speed and arg2 < musicspeed:
@@ -316,6 +373,10 @@ while not stopped and not looped:
 					# Fineslide down
 					period[t] = min(period[t] + arg2, periodtable[0])
 				perioddata[t] += [period[t]] * speed
+
+			# Vibrato/tremolo continuity
+			vibrato_ongoing[t] = cmd in [0x4, 0x6]
+			tremolo_ongoing[t] = cmd == 0x7
 
 		# Advance
 		posdata += [(p,r)] * speed
