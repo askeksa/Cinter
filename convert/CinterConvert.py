@@ -509,7 +509,7 @@ total_inst_size = 0
 total_inst_time = 1.0
 last_nonempty_inst = max(i for i in range(1, 32) if module.instruments[i].name.strip() != "" or i in inst_list)
 print
-print("Inst V Name                   Length Repeat Idx Count  Low High 9xx IDs Error?")
+print("Inst V Name                    Length Repeat Idx Count  Low High 9xx IDs Error?")
 for i in range(1, last_nonempty_inst + 1):
 	inst = module.instruments[i]
 
@@ -589,7 +589,7 @@ for i in range(1, last_nonempty_inst + 1):
 		inst_type = "R"
 		version_string = " "
 
-	print("%02d %c %1s %-22s %6d %6s  %2d %5d  %3s  %3s %3d %3d %s" % (
+	print("%02d %c %1s %-22s  %6d %6s  %2d %5d  %3s  %3s %3d %3d %s" % (
 		i, inst_type, version_string, inst.name, length * 2, "" if not replen else replen * 2, index, inst_counts[i],
 		notename(min_note), notename(max_note), len(offsets) - 1, n_note_ids, msg
 	))
@@ -620,7 +620,7 @@ if raw_inst_file is not None:
 		fout.write(inst.samples[:inst.length*2])
 	fout.close()
 
-print
+print()
 print("Uncompressed music data size: %7d bytes" % out_size)
 if raw_inst_size > 0:
 	print("Total raw instrument size:    %7d bytes" % (raw_inst_size * 2))
